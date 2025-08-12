@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>BocheCrawler: Master of Card & Dice — Prototype v0.2</title>
+  <style>
+    :root{
+      --bg:#0b0b0c; --panel:#121215; --ink:#e7e3da; --muted:#a7a39a; --accent:#d84f4f; --gold:#c09b43; --good:#58c97c; --bad:#d45b5b; --blue:#4fa3d8; --vio:#7a5bd4;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;}
+    body{
+      margin:0; background:radial-gradient(1200px 700px at 50% -200px,#15151a,#0b0b0c); color:var(--ink); font-family: ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      display:flex; align-items:center; justify-content:center;
+    }
+    #game{width:100%; max-width:480px; height:100%; max-height:880px; background:linear-gradient(180deg,#0b0b0c 0%, #0e0e10 40%, #111116 100%); border:1px solid #222; border-radius:18px; box-shadow:0 10px 40px rgba(0,0,0,.6); overflow:hidden; position:relative}
+
+    .topbar{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:#0f0f12; border-bottom:1px solid #1f1f24; position:sticky; top:0; z-index:5}
+    .title{font-weight:700; letter-spacing:.5px; font-size:14px}
+    .btn{background:#1a1a20; color:var(--ink); border:1px solid #2a2a33; padding:8px 10px; border-radius:12px; font-weight:600; font-size:12px; cursor:pointer}
+    .btn:disabled{opacity:.5; cursor:not-allowed}
+
+    /* ARENA — Pokemon-like layout */
+    .arena{position:relative; padding:10px 12px; display:grid; grid-template-rows:220px 1fr 170px; gap:10px}
+
+    .stage{position:relative; background:linear-gradient(180deg,#0e0e12,#0b0b0c); border:1px solid #24242a; border-radius:16px; overflow:hidden}
+    .stage:before{content:""; position:absolute; inset:-2px; background:radial-gradient(200px 40px at 20% 85%, rgba(74,74,84,.4), transparent 50%), radial-gradient(200px 40px at 80% 20%, rgba(74,74,84,.25), transparent 50%)}
+
+    .field{position:absolute; inset:0; display:grid; grid-template-columns:1fr 1fr;}
+    .pad{padding:10px}
+
+    .entityBox{position:relative; padding:8px;}
+    .entityBox.enemy{justify-self:end; align-self:start;}
+    .entityBox.player{justify-self:start; align-self:end;}
+
+    .sprite{height:96px; width:96px; border-radius:10px; background:repeating-linear-gradient(90deg,#0c0c0f 0 4px,#0e0e12 4px 8px); border:1px solid #23232b; box-shadow:inset 0 0 0 2px #0f0f14, 0 10px 20px rgba(0,0,0,.4); image-rendering: pixelated; display:flex; align-items:center; justify-content:center; font-size:24px; position:relative}
+    .enemy .sprite{background:repeating-linear-gradient(90deg,#120c0c 0 4px,#150e0e 4px 8px)}
+
+    /* Idle bob animation */
+    @keyframes bob { 0%{transform:translateY(0)} 50%{transform:translateY(-4px)} 100%{transform:translateY(0)} }
+    .idle{animation:bob 1.6s ease-in-out infinite}
+
+    /* Damage floaters */
+    .float{position:absolute; left:50%; transform:translateX(-50%); color:#fff; font-weight:800; text-shadow:0 2px 8px rgba(0,0,0,.65); animation:floatUp .9s ease forwards}
+    @keyframes floatUp{0%{opacity:0; top:40%} 20%{opacity:1} 100%{top:10%; opacity:0}}
+
+    /* Status aura (Hex) */
+    .aura{position:absolute; inset:-4px; border-radius:12px; pointer-events:none;}
+    .aura.hex{box-shadow:0 0 18px 6px rgba(122,91,212,.35) inset, 0 0 24px rgba(122,91,212,.2)}
+
+    /* UI panels */
+    .panel{background:var(--panel); border:1px solid #24242a; border-radius:16px; padding:10px}
+    .row{display:flex; align-items:center; justify-content:space-between; gap:10px}
+
+    .statline{display:flex; gap:8px; align-items:center; font-size:12px; color:var(--muted)}
+    .tag{padding:2px 6px; border:1px solid #30303a; border-radius:999px}
+
+    .hpbar{position:relative; height:12px; background:#1a1a20; border:1px solid #2a2a33; border-radius:999px; overflow:hidden}
+    .hpfill{position:absolute; inset:0; width:100%; background:linear-gradient(90deg, #6ad17f, #3fb165)}
+
+    /* JOKER-LIKE DICE TRAY */
+    .jokers{display:flex; gap:10px; overflow:auto; padding:6px 4px}
+    .joker{min-width:120px; background:#141419; border:1px solid #2a2a33; border-radius:14px; padding:8px; position:relative; box-shadow:0 6px 16px rgba(0,0,0,.25)}
+    .joker:hover{transform:translateY(-2px)}
+    .joker h4{margin:0; font-size:12px; color:var(--muted)}
+    .pip{font-size:22px; font-weight:800}
+    .joker .meta{font-size:11px; color:var(--muted)}
+    .joker.spectral{outline:1px dashed var(--gold); box-shadow:0 0 10px rgba(192,155,67,.25)}
+
+    .controls{display:flex; gap:8px; flex-wrap:wrap}
+
+    /* Cards hand */
+    .hand{display:flex; gap:8px; overflow:auto; padding-bottom:4px}
+    .cardbtn{min-width:140px; background:#141419; border:1px solid #2a2a33; border-radius:14px; padding:8px; text-align:left}
+    .cardbtn .name{font-weight:700; font-size:13px}
+    .cardbtn .desc{font-size:11px; color:var(--muted)}
+
+    .actionbar{position:sticky; bottom:0; background:#0e0e12; border-top:1px solid #1f1f24; padding:10px 12px; display:flex; flex-direction:column; gap:8px}
+    .abrow{display:flex; align-items:center; justify-content:space-between; gap:8px}
+
+    .log{max-height:120px; overflow:auto; font-size:12px; line-height:1.35; color:var(--muted); border-top:1px dashed #2a2a33; padding-top:6px}
+    .log p{margin:4px 0}
+
+    /* Rolling animation */
+    @keyframes roll { 0%{transform:rotate(0) scale(1)} 50%{transform:rotate(9deg) scale(1.04)} 100%{transform:rotate(0) scale(1)} }
+    .rolling{animation:roll .35s ease;}
+
+    /* Hit flash / screenshake */
+    @keyframes flash {0%{filter:none} 50%{filter:brightness(1.7)} 100%{filter:none}}
+    .flash{animation:flash .2s ease}
+    @keyframes shake {0%{transform:translate(0,0)} 25%{transform:translate(2px,-2px)} 50%{transform:translate(-2px,2px)} 75%{transform:translate(2px,1px)} 100%{transform:translate(0,0)}}
+    .shake{animation:shake .25s linear}
+
+    .lootbox{position:absolute; inset:0; background:rgba(0,0,0,.75); display:none; align-items:center; justify-content:center; padding:16px; z-index:10}
+    .modal{background:#131318; border:1px solid #2a2a33; border-radius:16px; width:100%; max-width:400px; padding:12px}
+    .modal h3{margin:0 0 8px 0}
+    .choices{display:grid; grid-template-columns:1fr; gap:8px}
+
+    .pill{padding:3px 6px; border:1px solid #333; border-radius:999px; font-size:11px; color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div class="topbar">
+      <div class="title">BocheCrawler v0.2 — Pokemon layout + Joker dice</div>
+      <div>
+        <button class="btn" id="btnNew">New Run</button>
+      </div>
+    </div>
+
+    <!-- STAGE (Pokemon-style opposing corners) -->
+    <div class="arena">
+      <div class="stage">
+        <div class="field">
+          <div class="entityBox player">
+            <div class="sprite idle" id="playerSprite">🗡️<div class="aura" id="playerAura"></div></div>
+            <div class="panel" style="margin-top:6px; width:200px">
+              <div class="statline"><span class="tag">Initiate</span><span class="tag">SPD <b id="playerSPD">6</b></span></div>
+              <div class="hpbar"><div class="hpfill" id="playerHPFill"></div></div>
+              <div class="statline"><span>HP <b id="playerHP">35</b>/<b id="playerHPMax">35</b></span> <span class="tag">Block <b id="playerBlock">0</b></span> <span class="tag">Hex <b id="playerHex">0</b></span></div>
+            </div>
+          </div>
+          <div class="entityBox enemy">
+            <div class="sprite idle" id="enemySprite">🩸<div class="aura" id="enemyAura"></div></div>
+            <div class="panel" style="margin-top:6px; width:200px">
+              <div class="statline"><span class="tag" id="enemyName">Bone Warlock</span><span class="tag">SPD <b id="enemySPD">5</b></span><span class="tag">INTENT <b id="enemyIntent">Strike</b></span></div>
+              <div class="hpbar"><div class="hpfill" id="enemyHPFill"></div></div>
+              <div class="statline"><span>HP <b id="enemyHP">30</b>/<b id="enemyHPMax">30</b></span> <span class="tag">Block <b id="enemyBlock">0</b></span> <span class="tag">Hex <b id="enemyHex">0</b></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- JOKER-LIKE DICE STRIP (Balatro vibe) -->
+      <div class="panel">
+        <div class="row" style="margin-bottom:6px">
+          <div class="statline">
+            <span class="tag">Energy <b id="energy">3</b></span>
+            <span class="tag">Rerolls <b id="rerolls">1</b></span>
+            <span class="tag">LCK <b id="luck">0</b></span>
+            <span class="tag">Turn <b id="turn">Player</b></span>
+          </div>
+          <div class="controls">
+            <button class="btn" id="btnRoll">Roll</button>
+            <button class="btn" id="btnReroll" disabled>Reroll</button>
+            <button class="btn" id="btnEndTurn" disabled>End</button>
+            <button class="btn" id="btnAddSpectral">+Spectral</button>
+          </div>
+        </div>
+        <div class="jokers" id="diceTray"></div>
+      </div>
+
+      <!-- HAND + LOG -->
+      <div class="panel">
+        <div class="hand" id="hand"></div>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+
+    <!-- Loot Modal -->
+    <div class="lootbox" id="lootBox">
+      <div class="modal">
+        <h3>Choose your reward</h3>
+        <div class="choices" id="lootChoices"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // -------------------------
+    // Utility & Data
+    // -------------------------
+    const logEl = document.getElementById('log');
+    function log(msg){ const p = document.createElement('p'); p.textContent = msg; logEl.prepend(p); }
+    function clamp(n,min,max){return Math.max(min, Math.min(max,n));}
+    function rand(n){return Math.floor(Math.random()*n)}
+    function pick(arr){return arr[rand(arr.length)]}
+
+    // Particle pop for hits
+    function popParticles(el, count=8){
+      for(let i=0;i<count;i++){
+        const s = document.createElement('span');
+        s.style.position='absolute';
+        s.style.left = '50%'; s.style.top = '50%';
+        s.style.width = '4px'; s.style.height='4px'; s.style.borderRadius='50%';
+        s.style.background = 'rgba(216,79,79,.9)';
+        const dx = (Math.random()*2-1)*36; const dy = (Math.random()*2-1)*36;
+        s.style.transform = `translate(${dx}px, ${dy}px)`;
+        s.style.opacity='0'; s.style.transition='transform .45s ease, opacity .45s ease';
+        el.appendChild(s);
+        requestAnimationFrame(()=>{ s.style.opacity='1'; s.style.transform=`translate(${dx}px, ${dy}px)`; setTimeout(()=>{s.remove()},450); });
+      }
+    }
+
+    function floatText(el, text, color='#fff'){
+      const f = document.createElement('div'); f.className='float'; f.style.color=color; f.textContent=text; el.appendChild(f); setTimeout(()=>f.remove(),900);
+    }
+
+    const FACE = {
+      SWORD: { key:'SWORD', icon:'⚔️', desc:'Deal damage' },
+      SHIELD:{ key:'SHIELD', icon:'🛡️', desc:'Gain block' },
+      EYE:   { key:'EYE', icon:'👁️', desc:'+Luck / Crit' },
+      FLAME: { key:'FLAME', icon:'🔥', desc:'Apply Burn (DoT)' },
+      HEX:   { key:'HEX', icon:'☠️', desc:'Apply Hex (Dark vulner.)' },
+      SKULL: { key:'SKULL', icon:'💀', desc:'Cursed: add Hex card, gain slight power' },
+      WILD:  { key:'WILD', icon:'⭐', desc:'Counts as best this turn' },
+    };
+
+    const BASE_DICE_POOL = [
+      {name:'Initiate Die', faces:[FACE.SWORD, FACE.SWORD, FACE.SHIELD, FACE.EYE, FACE.FLAME, FACE.SKULL], power:1, affix:'Common', spectral:false},
+      {name:'Omen-Carved', faces:[FACE.SWORD, FACE.SWORD, FACE.HEX, FACE.SKULL, FACE.FLAME, FACE.SKULL], power:2, affix:'Uncommon', spectral:false},
+      {name:'Blessed Cube', faces:[FACE.SWORD, FACE.WILD, FACE.SHIELD, FACE.EYE, FACE.FLAME, FACE.SHIELD], power:1, affix:'Uncommon', spectral:false},
+      {name:'Piercing Prism', faces:[FACE.SWORD, FACE.SWORD, FACE.SWORD, FACE.SHIELD, FACE.EYE, FACE.FLAME], power:2, affix:'Rare', spectral:false},
+    ];
+
+    function makeSpectralDie(){
+      return {name:'Spectral Echo', faces:[FACE.WILD, FACE.SWORD, FACE.HEX, FACE.SKULL, FACE.FLAME, FACE.EYE], power:2, affix:'Spectral', spectral:true};
+    }
+
+    const CARD_DB = {
+      Strike:  {cost:1, text:'Deal ATK + dice to enemy.', play: (G)=>{ let dmg = G.player.ATK + (G.turnCache.lastDiePower||0); dealDamage(G,'enemy', dmg, 'Strike'); }},
+      Guard:   {cost:1, text:'Gain 6 Block.', play: (G)=>{ gainBlock(G,'player',6); }},
+      HexBolt: {cost:1, text:'Apply 2 Hex.', play: (G)=>{ applyHex(G,'enemy',2); }},
+      Reroll:  {cost:0, text:'+1 Reroll this turn.', play: (G)=>{ G.turnCache.rerolls++; updateStats(); log('You feel fate bend. +1 Reroll'); }},
+      Convert: {cost:1, text:'Convert 1 Shield face to Sword this turn.', play:(G)=>{ const d = G.dice.find(d=>d.current && d.current.key==='SHIELD'); if(d){ d.current = FACE.SWORD; d.currentPower = (d.power||1); renderDice(); log('A shield becomes a blade.'); } else log('No shield face to convert.'); }},
+    };
+
+    function starterDeck(){ return ['Strike','Strike','Strike','Guard','Guard','HexBolt','Reroll','Convert','Strike','Guard']; }
+
+    const ENEMIES = [
+      {name:'Bone Warlock', hp:30, ATK:4, SPD:5, intent:'Strike', sprite:'🩸'},
+      {name:'Spined Thrall', hp:26, ATK:5, SPD:4, intent:'Strike', sprite:'🦴'},
+      {name:'Crypt Hound', hp:24, ATK:6, SPD:7, intent:'Bite', sprite:'🐺'},
+    ];
+
+    // -------------------------
+    // Game State
+    // -------------------------
+    const G = {
+      player:{ hp:35, hpMax:35, block:0, hex:0, ATK:5, DEF:0, SPD:6, LCK:0 },
+      enemy:null,
+      energy:3, baseEnergy:3,
+      turn:'player',
+      dice:[],
+      hand:[], drawPile:[], discard:[],
+      rerolls:1,
+      spectralCount:0,
+      turnCache:{ lastDiePower:0, rerolls:1 },
+      floor:1, node:1
+    };
+
+    // -------------------------
+    // Setup & Rendering
+    // -------------------------
+    const refs = {
+      enemyName:document.getElementById('enemyName'), enemyHP:document.getElementById('enemyHP'), enemyHPMax:document.getElementById('enemyHPMax'), enemyHPFill:document.getElementById('enemyHPFill'), enemyBlock:document.getElementById('enemyBlock'), enemyHex:document.getElementById('enemyHex'), enemySPD:document.getElementById('enemySPD'), enemyIntent:document.getElementById('enemyIntent'), enemySprite:document.getElementById('enemySprite'), enemyAura:document.getElementById('enemyAura'),
+      playerHP:document.getElementById('playerHP'), playerHPMax:document.getElementById('playerHPMax'), playerHPFill:document.getElementById('playerHPFill'), playerBlock:document.getElementById('playerBlock'), playerHex:document.getElementById('playerHex'), playerSPD:document.getElementById('playerSPD'), playerATK:document.getElementById('playerATK'), playerDEF:document.getElementById('playerDEF'), playerSprite:document.getElementById('playerSprite'), playerAura:document.getElementById('playerAura'),
+      energy:document.getElementById('energy'), rerolls:document.getElementById('rerolls'), luck:document.getElementById('luck'), turn:document.getElementById('turn'),
+      diceTray:document.getElementById('diceTray'),
+      hand:document.getElementById('hand'),
+      btnRoll:document.getElementById('btnRoll'), btnReroll:document.getElementById('btnReroll'), btnEndTurn:document.getElementById('btnEndTurn'), btnAddSpectral:document.getElementById('btnAddSpectral'),
+      lootBox:document.getElementById('lootBox'), lootChoices:document.getElementById('lootChoices'),
+      btnNew:document.getElementById('btnNew')
+    };
+
+    refs.btnNew.addEventListener('click', newRun);
+    refs.btnRoll.addEventListener('click', rollDice);
+    refs.btnEndTurn.addEventListener('click', endTurn);
+    refs.btnReroll.addEventListener('click', rerollSelected);
+    refs.btnAddSpectral.addEventListener('click', addSpectralDie);
+
+    function newRun(){
+      // Reset
+      Object.assign(G.player, { hp:35, hpMax:35, block:0, hex:0, ATK:5, DEF:0, SPD:6, LCK:0 });
+      G.energy = G.baseEnergy = 3;
+      G.rerolls = 1;
+      G.turn = 'player';
+      G.dice = [ cloneDie(BASE_DICE_POOL[0]), cloneDie(BASE_DICE_POOL[2]), cloneDie(BASE_DICE_POOL[1]) ];
+      G.spectralCount = 0;
+      G.drawPile = shuffle(starterDeck().slice());
+      G.discard = []; G.hand = [];
+      spawnEnemy();
+      startPlayerTurn(true);
+      log('— New run begins. The Mother‑Die watches. —');
+    }
+
+    function cloneDie(d){ return JSON.parse(JSON.stringify(d)); }
+    function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } return a }
+
+    function spawnEnemy(){
+      const e = JSON.parse(JSON.stringify(pick(ENEMIES)));
+      e.block = 0; e.hex = 0; e.hpMax = e.hp;
+      G.enemy = e;
+      document.getElementById('enemyName').textContent = e.name;
+      document.getElementById('enemySPD').textContent = e.SPD;
+      document.getElementById('enemySprite').textContent = e.sprite;
+      chooseEnemyIntent();
+      updateStats();
+    }
+
+    function chooseEnemyIntent(){
+      const intents = ['Strike','Guard','Hex'];
+      G.enemy.intent = pick(intents);
+      document.getElementById('enemyIntent').textContent = G.enemy.intent;
+    }
+
+    function updateStats(){
+      // Enemy
+      document.getElementById('enemyHP').textContent = G.enemy.hp; document.getElementById('enemyHPMax').textContent = G.enemy.hpMax; document.getElementById('enemyBlock').textContent = G.enemy.block; document.getElementById('enemyHex').textContent = G.enemy.hex;
+      const ePct = clamp(G.enemy.hp/G.enemy.hpMax*100,0,100); document.getElementById('enemyHPFill').style.width = ePct+'%';
+      document.getElementById('enemyAura').className = 'aura' + (G.enemy.hex>0 ? ' hex':'');
+      // Player
+      document.getElementById('playerHP').textContent = G.player.hp; document.getElementById('playerHPMax').textContent = G.player.hpMax; document.getElementById('playerBlock').textContent = G.player.block; document.getElementById('playerHex').textContent = G.player.hex;
+      const pPct = clamp(G.player.hp/G.player.hpMax*100,0,100); document.getElementById('playerHPFill').style.width = pPct+'%';
+      document.getElementById('playerSPD').textContent = G.player.SPD;
+      document.getElementById('energy').textContent = G.energy; document.getElementById('rerolls').textContent = G.turnCache?.rerolls ?? G.rerolls; document.getElementById('luck').textContent = G.player.LCK; document.getElementById('turn').textContent = G.turn==='player'?'Player':'Enemy';
+      renderDice(); renderHand();
+    }
+
+    function renderDice(){
+      const tray = document.getElementById('diceTray'); tray.innerHTML = '';
+      G.dice.forEach((d,idx)=>{
+        const el = document.createElement('div'); el.className = 'joker'+(d.spectral?' spectral':''); el.dataset.idx = idx;
+        const h4 = document.createElement('h4'); h4.textContent = d.name; el.appendChild(h4);
+        const face = document.createElement('div'); face.className = 'pip'; face.textContent = d.current ? d.current.icon : '—'; el.appendChild(face);
+        const meta = document.createElement('div'); meta.className='meta'; meta.textContent = `${d.affix} • Pwr ${(d.currentPower||d.power||1)}`; el.appendChild(meta);
+        el.addEventListener('click', ()=>{
+          document.querySelectorAll('.joker').forEach(x=>x.style.outline='');
+          el.style.outline = '2px solid var(--blue)';
+          G.selectedDie = idx; document.getElementById('btnReroll').disabled = (G.turn!=='player' || (G.turnCache.rerolls||0)<=0 || !d.current);
+        });
+        tray.appendChild(el);
+      })
+    }
+
+    function renderHand(){
+      const h = document.getElementById('hand'); h.innerHTML = '';
+      G.hand.forEach((name,i)=>{
+        const def = CARD_DB[name];
+        const btn = document.createElement('button'); btn.className='cardbtn'; btn.disabled = (G.turn!=='player' || G.energy < def.cost);
+        btn.innerHTML = `<div class="name">${name} <span class="pill">${def.cost}</span></div><div class="desc">${def.text}</div>`;
+        btn.addEventListener('click',()=> playCard(i));
+        h.appendChild(btn);
+      });
+    }
+
+    // -------------------------
+    // Turn Flow
+    // -------------------------
+    function startPlayerTurn(fresh=false){
+      G.turn='player';
+      G.turnCache = { lastDiePower:0, rerolls: (1 + Math.floor(G.player.LCK/10)) };
+      G.energy = G.baseEnergy;
+      G.player.block = 0; // block refresh each turn (simple rule)
+      drawCards( G.hand.length ? (fresh?3: (3 - G.hand.length)) : 3 );
+      updateStats();
+      document.getElementById('btnRoll').disabled = false; document.getElementById('btnEndTurn').disabled = true; document.getElementById('btnReroll').disabled = true; G.dice.forEach(d=>{ d.current=null; d.currentPower=null; }); renderDice();
+      log('Your turn. Roll the dice.');
+    }
+
+    function rollDice(){
+      const jokerEls = Array.from(document.querySelectorAll('.joker'));
+      jokerEls.forEach(el=> el.classList.add('rolling'));
+      setTimeout(()=> jokerEls.forEach(el=> el.classList.remove('rolling')), 350);
+
+      G.dice.forEach(d=>{
+        const idx = rand(d.faces.length);
+        d.current = d.faces[idx];
+        d.currentPower = (d.power||1) + (d.current.key==='SKULL'?1:0); // skulls hit harder
+      });
+      // Handle EYE (luck) incremental
+      const eyes = G.dice.filter(d=>d.current && d.current.key==='EYE').length;
+      if(eyes>0){ G.player.LCK += eyes; floatText(document.getElementById('playerSprite'), `+${eyes} LCK`, '#9fd19f'); log(`The Eye gazes. +${eyes} Luck this run.`); }
+      // Handle SKULL (curse) inject Hex card
+      const skulls = G.dice.filter(d=>d.current && d.current.key==='SKULL').length;
+      if(skulls>0){ G.discard.push('HexBolt'); floatText(document.getElementById('playerSprite'), `CURSED`, '#d45b5b'); log(`Cursed skulls grin (${skulls}). A Hex seeps into your deck.`); }
+      G.turnCache.lastDiePower = G.dice.reduce((m,d)=> m + (d.currentPower||0),0);
+      document.getElementById('btnRoll').disabled = true; document.getElementById('btnEndTurn').disabled = false; document.getElementById('btnReroll').disabled = true;
+      updateStats();
+    }
+
+    function rerollSelected(){
+      const i = G.selectedDie; if(i==null) return;
+      if(G.turnCache.rerolls<=0) return;
+      const d = G.dice[i];
+      const idx = rand(d.faces.length); d.current = d.faces[idx]; d.currentPower = (d.power||1) + (d.current.key==='SKULL'?1:0);
+      G.turnCache.rerolls--; log(`Rerolled ${d.name}: ${d.current.icon}`);
+      G.turnCache.lastDiePower = G.dice.reduce((m,d)=> m + (d.currentPower||0),0);
+      document.getElementById('btnReroll').disabled = (G.turnCache.rerolls<=0);
+      updateStats();
+    }
+
+    function endTurn(){
+      document.getElementById('btnEndTurn').disabled = true; document.getElementById('btnRoll').disabled = true; document.getElementById('btnReroll').disabled = true;
+      enemyTurn();
+    }
+
+    function enemyTurn(){
+      G.turn='enemy'; updateStats();
+      // Simple AI
+      if(G.enemy.intent==='Strike'){
+        const dmg = G.enemy.ATK + rand(3);
+        dealDamage(G,'player', dmg, 'Enemy strike');
+      } else if(G.enemy.intent==='Guard'){
+        gainBlock(G,'enemy', 6);
+      } else {
+        applyHex(G,'player', 2);
+      }
+      chooseEnemyIntent();
+      checkEnd();
+      if(G.player.hp>0 && G.enemy.hp>0){ startPlayerTurn(); }
+    }
+
+    // -------------------------
+    // Cards & Drawing
+    // -------------------------
+    function drawCards(n){
+      for(let i=0;i<n;i++){
+        if(G.drawPile.length===0){ G.drawPile = shuffle(G.discard); G.discard = []; }
+        if(G.drawPile.length===0) return; // nothing
+        G.hand.push(G.drawPile.pop());
+      }
+    }
+
+    function playCard(index){
+      const name = G.hand[index]; const def = CARD_DB[name];
+      if(G.energy < def.cost) return;
+      G.energy -= def.cost;
+      def.play(G);
+      // move card to discard
+      const [c] = G.hand.splice(index,1); G.discard.push(c);
+      updateStats();
+      checkEnd();
+    }
+
+    // -------------------------
+    // Combat Helpers + VFX
+    // -------------------------
+    function dealDamage(G, target, amount, label='Hit'){
+      const t = target==='enemy'?G.enemy:G.player;
+      const sprite = target==='enemy'?document.getElementById('enemySprite'):document.getElementById('playerSprite');
+      let mult = 1;
+      if(target==='enemy' && G.enemy.hex>0) mult += 0.25; // simplified
+      const raw = Math.round(amount*mult);
+      let dmg = Math.max(0, raw - (t.block||0));
+      const blockUsed = Math.min(t.block||0, raw);
+      t.block = Math.max(0, (t.block||0) - raw);
+      t.hp = clamp(t.hp - dmg, 0, t.hpMax);
+      sprite.classList.add('flash','shake'); popParticles(sprite, 8); floatText(sprite, `-${dmg}`, '#ffd2d2');
+      setTimeout(()=>{sprite.classList.remove('flash','shake')}, 250);
+      log(`${label}: ${raw} (${blockUsed} blocked) → ${dmg} dmg to ${target}`);
+      updateStats();
+    }
+    function gainBlock(G, who, amount){ const t = (who==='enemy'?G.enemy:G.player); const sprite = who==='enemy'?document.getElementById('enemySprite'):document.getElementById('playerSprite'); t.block = (t.block||0)+amount; floatText(sprite, `+${amount} BLK`, '#9fd1ff'); log(`${who} gains ${amount} block.`); updateStats(); }
+    function applyHex(G, who, stacks){ const t = (who==='enemy'?G.enemy:G.player); const aura = who==='enemy'?document.getElementById('enemyAura'):document.getElementById('playerAura'); t.hex = (t.hex||0)+stacks; aura.classList.add('hex'); floatText((who==='enemy'?document.getElementById('enemySprite'):document.getElementById('playerSprite')), `HEX ${t.hex}`, '#c9b3ff'); log(`${who} is hexed (${t.hex}).`); updateStats(); }
+
+    // -------------------------
+    // Spectral Dice & Loot
+    // -------------------------
+    function addSpectralDie(){
+      if(G.spectralCount>=2){ log('The air is saturated with echoes. No more spectral dice.'); return; }
+      const d = makeSpectralDie();
+      G.dice.push(d); G.spectralCount++; renderDice(); log('A Spectral Echo joins your cup.');
+    }
+
+    function onVictory(){
+      log('— Victory! —');
+      showLoot();
+    }
+
+    function showLoot(){
+      document.getElementById('lootChoices').innerHTML = '';
+      const options = [
+        {type:'die', item: cloneDie(pick(BASE_DICE_POOL))},
+        {type:'card', item: pick(Object.keys(CARD_DB))},
+        {type:'relic', item: {name:'Obsidian Rosary', effect:'+1 reroll each turn'}},
+      ];
+      options.forEach((opt,i)=>{
+        const btn = document.createElement('button'); btn.className='btn'; btn.style.width='100%';
+        if(opt.type==='die') btn.innerHTML = `Die: <b>${opt.item.name}</b> <span class="pill">${opt.item.affix}</span>`;
+        if(opt.type==='card') btn.innerHTML = `Card: <b>${opt.item}</b>`;
+        if(opt.type==='relic') btn.innerHTML = `Relic: <b>${opt.item.name}</b> <span class="pill">${opt.item.effect}</span>`;
+        btn.addEventListener('click',()=>{
+          if(opt.type==='die') G.dice.push(opt.item);
+          if(opt.type==='card') { G.discard.push(opt.item); }
+          if(opt.type==='relic') { G.baseEnergy = 3; G.rerolls = 2; }
+          document.getElementById('lootBox').style.display='none';
+          // next enemy
+          spawnEnemy();
+          startPlayerTurn(true);
+        });
+        document.getElementById('lootChoices').appendChild(btn);
+      });
+      document.getElementById('lootBox').style.display='flex';
+    }
+
+    function checkEnd(){
+      if(G.enemy.hp<=0){ onVictory(); return; }
+      if(G.player.hp<=0){ log('— You die. The run ends. —'); alert('You died! New run starting.'); newRun(); }
+    }
+
+    // -------------------------
+    // Boot
+    // -------------------------
+    newRun();
+  </script>
+</body>
+</html>
