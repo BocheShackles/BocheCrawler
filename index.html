@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>BocheCrawler v0.3 — Balatro-style Dice Strip</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <style>
+    :root{
+      --bg:#0b0b0c; --panel:#121215; --ink:#e7e3da; --muted:#a7a39a; --accent:#d84f4f; --gold:#c09b43; --good:#58c97c; --bad:#d45b5b; --blue:#4fa3d8; --vio:#7a5bd4;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;}
+    body{
+      margin:0; background:radial-gradient(1200px 700px at 50% -200px,#15151a,#0b0b0c); color:var(--ink);
+      font-family: ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      display:flex; align-items:center; justify-content:center;
+    }
+    #game{width:100%; max-width:520px; height:100%; max-height:920px; background:linear-gradient(180deg,#0b0b0c 0%, #0e0e10 40%, #111116 100%); border:1px solid #222; border-radius:18px; box-shadow:0 10px 40px rgba(0,0,0,.6); overflow:hidden; position:relative}
+
+    .topbar{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:#0f0f12; border-bottom:1px solid #1f1f24; position:sticky; top:0; z-index:5}
+    .title{font-weight:700; letter-spacing:.5px; font-size:14px}
+    .btn{background:#1a1a20; color:var(--ink); border:1px solid #2a2a33; padding:8px 10px; border-radius:12px; font-weight:600; font-size:12px; cursor:pointer}
+    .btn:disabled{opacity:.5; cursor:not-allowed}
+
+    /* ARENA — Pokemon-like layout */
+    .arena{position:relative; padding:10px 12px; display:grid; grid-template-rows:220px 1fr 220px; gap:10px}
+    .stage{position:relative; background:linear-gradient(180deg,#0e0e12,#0b0b0c); border:1px solid #24242a; border-radius:16px; overflow:hidden}
+    .field{position:absolute; inset:0; display:grid; grid-template-columns:1fr 1fr;}
+    .entityBox{position:relative; padding:8px;}
+    .entityBox.enemy{justify-self:end; align-self:start;}
+    .entityBox.player{justify-self:start; align-self:end;}
+    .sprite{height:96px; width:96px; border-radius:10px; background:repeating-linear-gradient(90deg,#0c0c0f 0 4px,#0e0e12 4px 8px); border:1px solid #23232b; box-shadow:inset 0 0 0 2px #0f0f14, 0 10px 20px rgba(0,0,0,.4); image-rendering: pixelated; display:flex; align-items:center; justify-content:center; font-size:24px; position:relative}
+    .enemy .sprite{background:repeating-linear-gradient(90deg,#120c0c 0 4px,#150e0e 4px 8px)}
+    @keyframes bob { 0%{transform:translateY(0)} 50%{transform:translateY(-4px)} 100%{transform:translateY(0)} } .idle{animation:bob 1.6s ease-in-out infinite}
+    .aura{position:absolute; inset:-4px; border-radius:12px; pointer-events:none;} .aura.hex{box-shadow:0 0 18px 6px rgba(122,91,212,.35) inset, 0 0 24px rgba(122,91,212,.2)}
+    .hpbar{position:relative; height:12px; background:#1a1a20; border:1px solid #2a2a33; border-radius:999px; overflow:hidden}
+    .hpfill{position:absolute; inset:0; width:100%; background:linear-gradient(90deg, #6ad17f, #3fb165)}
+    .panel{background:var(--panel); border:1px solid #24242a; border-radius:16px; padding:10px}
+    .row{display:flex; align-items:center; justify-content:space-between; gap:10px}
+    .statline{display:flex; gap:8px; align-items:center; font-size:12px; color:var(--muted)}
+    .tag{padding:2px 6px; border:1px solid #30303a; border-radius:999px}
+
+    /* Balatro-style horizontal joker strip */
+    .jokersWrap{display:flex; align-items:center; gap:8px}
+    .scrollHint{font-size:11px; color:var(--muted)}
+    .jokers{display:flex; gap:10px; overflow-x:auto; padding:8px 6px; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; scrollbar-width:thin; border-radius:12px; background:#101015}
+    .joker{width:140px; flex:0 0 auto; scroll-snap-align:start; background:#141419; border:1px solid #2a2a33; border-radius:14px; padding:10px; position:relative; box-shadow:0 6px 16px rgba(0,0,0,.25)}
+    .joker h4{margin:0 0 4px 0; font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .pip{font-size:28px; font-weight:800; margin:2px 0}
+    .meta{font-size:11px; color:var(--muted)}
+    .joker.spectral{outline:1px dashed var(--gold); box-shadow:0 0 10px rgba(192,155,67,.25)}
+    .pin{position:absolute; top:6px; right:6px; font-size:12px; opacity:.65; cursor:pointer}
+    .pinned{outline:2px solid var(--blue)}
+
+    /* Cards hand */
+    .handWrap{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px}
+    .handLabel{font-size:12px; color:var(--muted); letter-spacing:.3px}
+    .hand{display:flex; gap:8px; overflow-x:auto; padding:6px 4px; min-height:90px}
+    .cardbtn{min-width:150px; background:#141419; border:1px solid #2a2a33; border-radius:14px; padding:10px; text-align:left}
+    .cardbtn .name{font-weight:700; font-size:13px}
+    .cardbtn .desc{font-size:11px; color:var(--muted)}
+
+    .log{max-height:140px; overflow:auto; font-size:12px; line-height:1.35; color:var(--muted); border-top:1px dashed #2a2a33; padding-top:6px}
+    @keyframes roll { 0%{transform:rotate(0) scale(1)} 50%{transform:rotate(9deg) scale(1.04)} 100%{transform:rotate(0) scale(1)} } .rolling{animation:roll .35s ease;}
+    @keyframes flash {0%{filter:none} 50%{filter:brightness(1.7)} 100%{filter:none}} .flash{animation:flash .2s ease}
+    @keyframes shake {0%{transform:translate(0,0)} 25%{transform:translate(2px,-2px)} 50%{transform:translate(-2px,2px)} 75%{transform:translate(2px,1px)} 100%{transform:translate(0,0)}} .shake{animation:shake .25s linear}
+    .float{position:absolute; left:50%; transform:translateX(-50%); color:#fff; font-weight:800; text-shadow:0 2px 8px rgba(0,0,0,.65); animation:floatUp .9s ease forwards}
+    @keyframes floatUp{0%{opacity:0; top:40%} 20%{opacity:1} 100%{top:10%; opacity:0}}
+    .lootbox{position:absolute; inset:0; background:rgba(0,0,0,.75); display:none; align-items:center; justify-content:center; padding:16px; z-index:10}
+    .modal{background:#131318; border:1px solid #2a2a33; border-radius:16px; width:100%; max-width:420px; padding:12px}
+    .choices{display:grid; grid-template-columns:1fr; gap:8px}
+    .pill{padding:3px 6px; border:1px solid #333; border-radius:999px; font-size:11px; color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div class="topbar">
+      <div class="title">BocheCrawler v0.3 — Balatro Dice Strip</div>
+      <div class="row">
+        <button class="btn" id="btnNew">New Run</button>
+      </div>
+    </div>
+
+    <div class="arena">
+      <div class="stage">
+        <div class="field">
+          <div class="entityBox player">
+            <div class="sprite idle" id="playerSprite">🗡️<div class="aura" id="playerAura"></div></div>
+            <div class="panel" style="margin-top:6px; width:230px">
+              <div class="statline"><span class="tag">Initiate</span><span class="tag">SPD <b id="playerSPD">6</b></span></div>
+              <div class="hpbar"><div class="hpfill" id="playerHPFill"></div></div>
+              <div class="statline"><span>HP <b id="playerHP">35</b>/<b id="playerHPMax">35</b></span> <span class="tag">Block <b id="playerBlock">0</b></span> <span class="tag">Hex <b id="playerHex">0</b></span></div>
+            </div>
+          </div>
+          <div class="entityBox enemy">
+            <div class="sprite idle" id="enemySprite">🩸<div class="aura" id="enemyAura"></div></div>
+            <div class="panel" style="margin-top:6px; width:230px">
+              <div class="statline"><span class="tag" id="enemyName">Bone Warlock</span><span class="tag">SPD <b id="enemySPD">5</b></span><span class="tag">INTENT <b id="enemyIntent">Strike</b></span></div>
+              <div class="hpbar"><div class="hpfill" id="enemyHPFill"></div></div>
+              <div class="statline"><span>HP <b id="enemyHP">30</b>/<b id="enemyHPMax">30</b></span> <span class="tag">Block <b id="enemyBlock">0</b></span> <span class="tag">Hex <b id="enemyHex">0</b></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dice strip w/ scroll-snap (Balatro vibe) -->
+      <div class="panel">
+        <div class="row" style="margin-bottom:6px">
+          <div class="statline">
+            <span class="tag">Energy <b id="energy">3</b></span>
+            <span class="tag">Rerolls <b id="rerolls">1</b></span>
+            <span class="tag">LCK <b id="luck">0</b></span>
+            <span class="tag">Turn <b id="turn">Player</b></span>
+          </div>
+          <div class="row">
+            <span class="scrollHint">← swipe jokers →</span>
+            <button class="btn" id="btnRoll">Roll</button>
+            <button class="btn" id="btnReroll" disabled>Reroll</button>
+            <button class="btn" id="btnEndTurn" disabled>End</button>
+            <button class="btn" id="btnAddSpectral">+Spectral</button>
+          </div>
+        </div>
+        <div class="jokersWrap">
+          <div class="jokers" id="diceTray"></div>
+        </div>
+      </div>
+
+      <!-- Hand + log -->
+      <div class="panel">
+        <div class="handWrap">
+          <div class="handLabel">Hand</div>
+          <div class="statline"><span class="tag">In draw <b id="drawCount">0</b></span></div>
+        </div>
+        <div class="hand" id="hand"></div>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+
+    <div class="lootbox" id="lootBox">
+      <div class="modal">
+        <h3>Choose your reward</h3>
+        <div class="choices" id="lootChoices"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    function log(msg){ const p = document.createElement('p'); p.textContent = msg; logEl.prepend(p); }
+    function clamp(n,min,max){return Math.max(min, Math.min(max,n));}
+    function rand(n){return Math.floor(Math.random()*n)}
+    function pick(arr){return arr[rand(arr.length)]}
+    function floatText(el, text, color='#fff'){ const f = document.createElement('div'); f.className='float'; f.style.color=color; f.textContent=text; el.appendChild(f); setTimeout(()=>f.remove(),900); }
+    function popParticles(el, count=8){ for(let i=0;i<count;i++){ const s=document.createElement('span'); s.style.position='absolute'; s.style.left='50%'; s.style.top='50%'; s.style.width='4px'; s.style.height='4px'; s.style.borderRadius='50%'; s.style.background='rgba(216,79,79,.9)'; const dx=(Math.random()*2-1)*36, dy=(Math.random()*2-1)*36; s.style.transform=`translate(${dx}px, ${dy}px)`; s.style.opacity='0'; s.style.transition='transform .45s ease, opacity .45s ease'; el.appendChild(s); requestAnimationFrame(()=>{ s.style.opacity='1'; s.style.transform=`translate(${dx}px, ${dy}px)`; setTimeout(()=>{s.remove()},450); }); } }
+
+    const FACE = { SWORD:{key:'SWORD',icon:'⚔️',desc:'Deal damage'}, SHIELD:{key:'SHIELD',icon:'🛡️',desc:'Gain block'}, EYE:{key:'EYE',icon:'👁️',desc:'+Luck / Crit'}, FLAME:{key:'FLAME',icon:'🔥',desc:'Burn'}, HEX:{key:'HEX',icon:'☠️',desc:'Hex vuln'}, SKULL:{key:'SKULL',icon:'💀',desc:'Curse adds Hex'}, WILD:{key:'WILD',icon:'⭐',desc:'Counts best'} };
+    const BASE_DICE_POOL = [
+      {name:'Initiate Die', faces:[FACE.SWORD, FACE.SWORD, FACE.SHIELD, FACE.EYE, FACE.FLAME, FACE.SKULL], power:1, affix:'Common', spectral:false},
+      {name:'Omen-Carved', faces:[FACE.SWORD, FACE.SWORD, FACE.HEX, FACE.SKULL, FACE.FLAME, FACE.SKULL], power:2, affix:'Uncommon', spectral:false},
+      {name:'Blessed Cube', faces:[FACE.SWORD, FACE.WILD, FACE.SHIELD, FACE.EYE, FACE.FLAME, FACE.SHIELD], power:1, affix:'Uncommon', spectral:false},
+      {name:'Piercing Prism', faces:[FACE.SWORD, FACE.SWORD, FACE.SWORD, FACE.SHIELD, FACE.EYE, FACE.FLAME], power:2, affix:'Rare', spectral:false},
+    ];
+    function makeSpectralDie(){ return {name:'Spectral Echo', faces:[FACE.WILD, FACE.SWORD, FACE.HEX, FACE.SKULL, FACE.FLAME, FACE.EYE], power:2, affix:'Spectral', spectral:true}; }
+
+    const CARD_DB = {
+      Strike:{cost:1, text:'Deal ATK + dice to enemy.', play:G=>{ const dmg=G.player.ATK+(G.turnCache.lastDiePower||0); dealDamage(G,'enemy',dmg,'Strike'); }},
+      Guard:{cost:1, text:'Gain 6 Block.', play:G=>{ gainBlock(G,'player',6); }},
+      HexBolt:{cost:1, text:'Apply 2 Hex.', play:G=>{ applyHex(G,'enemy',2); }},
+      Reroll:{cost:0, text:'+1 Reroll this turn.', play:G=>{ G.turnCache.rerolls++; updateStats(); log('You feel fate bend. +1 Reroll'); }},
+      Convert:{cost:1, text:'Convert 1 Shield face to Sword this turn.', play:G=>{ const d=G.dice.find(d=>d.current&&d.current.key==='SHIELD'); if(d){ d.current=FACE.SWORD; d.currentPower=(d.power||1); renderDice(); log('A shield becomes a blade.'); } else log('No shield face to convert.'); }},
+    };
+    function starterDeck(){ return ['Strike','Strike','Strike','Guard','Guard','HexBolt','Reroll','Convert','Strike','Guard']; }
+
+    const ENEMIES=[
+      {name:'Bone Warlock', hp:30, ATK:4, SPD:5, intent:'Strike', sprite:'🩸'},
+      {name:'Spined Thrall', hp:26, ATK:5, SPD:4, intent:'Strike', sprite:'🦴'},
+      {name:'Crypt Hound', hp:24, ATK:6, SPD:7, intent:'Bite', sprite:'🐺'},
+    ];
+
+    const G = { player:{hp:35,hpMax:35,block:0,hex:0,ATK:5,DEF:0,SPD:6,LCK:0}, enemy:null, energy:3, baseEnergy:3, turn:'player', dice:[], hand:[], drawPile:[], discard:[], rerolls:1, spectralCount:0, turnCache:{lastDiePower:0, rerolls:1}, floor:1, node:1 };
+
+    const refs = {
+      enemyName:document.getElementById('enemyName'), enemyHP:document.getElementById('enemyHP'), enemyHPMax:document.getElementById('enemyHPMax'), enemyHPFill:document.getElementById('enemyHPFill'), enemyBlock:document.getElementById('enemyBlock'), enemyHex:document.getElementById('enemyHex'), enemySPD:document.getElementById('enemySPD'), enemyIntent:document.getElementById('enemyIntent'), enemySprite:document.getElementById('enemySprite'), enemyAura:document.getElementById('enemyAura'),
+      playerHP:document.getElementById('playerHP'), playerHPMax:document.getElementById('playerHPMax'), playerHPFill:document.getElementById('playerHPFill'), playerBlock:document.getElementById('playerBlock'), playerHex:document.getElementById('playerHex'), playerSPD:document.getElementById('playerSPD'), playerSprite:document.getElementById('playerSprite'), playerAura:document.getElementById('playerAura'),
+      energy:document.getElementById('energy'), rerolls:document.getElementById('rerolls'), luck:document.getElementById('luck'), turn:document.getElementById('turn'),
+      diceTray:document.getElementById('diceTray'),
+      hand:document.getElementById('hand'), drawCount:document.getElementById('drawCount'),
+      btnRoll:document.getElementById('btnRoll'), btnReroll:document.getElementById('btnReroll'), btnEndTurn:document.getElementById('btnEndTurn'), btnAddSpectral:document.getElementById('btnAddSpectral'),
+      lootBox:document.getElementById('lootBox'), lootChoices:document.getElementById('lootChoices'),
+      btnNew:document.getElementById('btnNew')
+    };
+
+    // Helpers
+    const logEl2 = document.getElementById('log');
+    function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } return a }
+    function cloneDie(d){ return JSON.parse(JSON.stringify(d)); }
+
+    // Buttons
+    refs.btnNew.addEventListener('click', newRun);
+    refs.btnRoll.addEventListener('click', rollDice);
+    refs.btnEndTurn.addEventListener('click', endTurn);
+    refs.btnReroll.addEventListener('click', rerollSelected);
+    refs.btnAddSpectral.addEventListener('click', addSpectralDie);
+
+    function newRun(){
+      Object.assign(G.player, {hp:35,hpMax:35,block:0,hex:0,ATK:5,DEF:0,SPD:6,LCK:0});
+      G.energy = G.baseEnergy = 3;
+      G.rerolls = 1;
+      G.turn = 'player';
+      G.dice = [ cloneDie(BASE_DICE_POOL[0]), cloneDie(BASE_DICE_POOL[2]), cloneDie(BASE_DICE_POOL[1]) ];
+      G.spectralCount = 0;
+      G.drawPile = shuffle(starterDeck().slice());
+      G.discard = []; G.hand = [];
+      renderDice();
+      spawnEnemy();
+      startPlayerTurn(true);
+      log('— New run begins. The Mother‑Die watches. —');
+    }
+
+    function spawnEnemy(){
+      const e = JSON.parse(JSON.stringify(pick(ENEMIES)));
+      e.block=0; e.hex=0; e.hpMax=e.hp; G.enemy=e;
+      document.getElementById('enemyName').textContent = e.name;
+      document.getElementById('enemySPD').textContent = e.SPD;
+      document.getElementById('enemySprite').textContent = e.sprite;
+      chooseEnemyIntent(); updateStats();
+    }
+    function chooseEnemyIntent(){ const intents=['Strike','Guard','Hex']; G.enemy.intent = pick(intents); document.getElementById('enemyIntent').textContent = G.enemy.intent; }
+
+    function updateStats(){
+      document.getElementById('enemyHP').textContent = G.enemy.hp; document.getElementById('enemyHPMax').textContent = G.enemy.hpMax; document.getElementById('enemyBlock').textContent = G.enemy.block; document.getElementById('enemyHex').textContent = G.enemy.hex;
+      const ePct = Math.max(0, Math.min(100, G.enemy.hp/G.enemy.hpMax*100)); document.getElementById('enemyHPFill').style.width = ePct+'%';
+      document.getElementById('enemyAura').className = 'aura' + (G.enemy.hex>0?' hex':'');
+      document.getElementById('playerHP').textContent = G.player.hp; document.getElementById('playerHPMax').textContent = G.player.hpMax; document.getElementById('playerBlock').textContent = G.player.block; document.getElementById('playerHex').textContent = G.player.hex;
+      const pPct = Math.max(0, Math.min(100, G.player.hp/G.player.hpMax*100)); document.getElementById('playerHPFill').style.width = pPct+'%';
+      document.getElementById('playerSPD').textContent = G.player.SPD;
+      document.getElementById('energy').textContent = G.energy; document.getElementById('rerolls').textContent = G.turnCache?.rerolls ?? G.rerolls; document.getElementById('luck').textContent = G.player.LCK; document.getElementById('turn').textContent = G.turn==='player'?'Player':'Enemy';
+      if(refs.drawCount) refs.drawCount.textContent = G.drawPile.length;
+      renderDice(); renderHand();
+    }
+
+    function renderDice(){
+      const tray = refs.diceTray; tray.innerHTML='';
+      if(!G.dice.length){ const tip=document.createElement('div'); tip.style.color='var(--muted)'; tip.style.fontSize='12px'; tip.style.padding='6px 4px'; tip.textContent='No dice equipped'; tray.appendChild(tip); return; }
+      G.dice.forEach((d,idx)=>{
+        const el = document.createElement('div'); el.className='joker'+(d.spectral?' spectral':''); el.dataset.idx=idx;
+        const pin = document.createElement('div'); pin.className='pin'; pin.textContent='📌'; pin.title='Pin (keeps selection)'; pin.addEventListener('click', (ev)=>{ ev.stopPropagation(); el.classList.toggle('pinned'); });
+        const h4 = document.createElement('h4'); h4.textContent=d.name;
+        const face = document.createElement('div'); face.className='pip'; face.textContent=d.current?d.current.icon:'—';
+        const meta = document.createElement('div'); meta.className='meta'; meta.textContent = `${d.affix} • Pwr ${(d.currentPower||d.power||1)}`;
+        el.appendChild(pin); el.appendChild(h4); el.appendChild(face); el.appendChild(meta);
+        el.addEventListener('click', ()=>{
+          document.querySelectorAll('.joker').forEach(x=>{ if(!x.classList.contains('pinned')) x.style.outline=''; });
+          el.style.outline='2px solid var(--blue)'; G.selectedDie=idx; refs.btnReroll.disabled = (G.turn!=='player'||(G.turnCache.rerolls||0)<=0||!d.current);
+        });
+        tray.appendChild(el);
+      });
+    }
+
+    function renderHand(){
+      const h=refs.hand; h.innerHTML='';
+      if(!G.hand.length){ const tip=document.createElement('div'); tip.style.color='var(--muted)'; tip.style.fontSize='12px'; tip.textContent='(No cards in hand — roll dice or end turn)'; h.appendChild(tip); return; }
+      G.hand.forEach((name,i)=>{
+        const def=CARD_DB[name];
+        const btn=document.createElement('button'); btn.className='cardbtn'; btn.disabled=(G.turn!=='player'||G.energy<def.cost);
+        btn.innerHTML=`<div class="name">${name} <span class="pill">${def.cost}</span></div><div class="desc">${def.text}</div>`;
+        btn.addEventListener('click',()=> playCard(i));
+        h.appendChild(btn);
+      });
+    }
+
+    function startPlayerTurn(fresh=false){
+      G.turn='player'; G.turnCache={lastDiePower:0, rerolls:(1+Math.floor(G.player.LCK/10))}; G.energy=G.baseEnergy; G.player.block=0;
+      const drawN=(G.hand.length && !fresh)?(3-G.hand.length):3; drawCards(drawN);
+      refs.btnRoll.disabled=false; refs.btnEndTurn.disabled=true; refs.btnReroll.disabled=true; G.dice.forEach(d=>{ d.current=null; d.currentPower=null; });
+      updateStats(); log('Your turn. Roll the dice.');
+    }
+
+    function rollDice(){
+      const jokersEls=[...document.querySelectorAll('.joker')]; jokersEls.forEach(el=> el.classList.add('rolling')); setTimeout(()=>jokersEls.forEach(el=>el.classList.remove('rolling')),350);
+      G.dice.forEach(d=>{ const idx=rand(d.faces.length); d.current=d.faces[idx]; d.currentPower=(d.power||1)+(d.current.key==='SKULL'?1:0); });
+      const eyes=G.dice.filter(d=>d.current&&d.current.key==='EYE').length; if(eyes>0){ G.player.LCK+=eyes; floatText(refs.playerSprite,`+${eyes} LCK`,'#9fd19f'); log(`The Eye gazes. +${eyes} Luck this run.`); }
+      const skulls=G.dice.filter(d=>d.current&&d.current.key==='SKULL').length; if(skulls>0){ G.discard.push('HexBolt'); floatText(refs.playerSprite,'CURSED','#d45b5b'); log(`Cursed skulls grin (${skulls}). A Hex seeps into your deck.`); }
+      G.turnCache.lastDiePower=G.dice.reduce((m,d)=>m+(d.currentPower||0),0);
+      refs.btnRoll.disabled=true; refs.btnEndTurn.disabled=false; refs.btnReroll.disabled=true;
+      updateStats();
+    }
+
+    function rerollSelected(){
+      const i=G.selectedDie; if(i==null) return; if(G.turnCache.rerolls<=0) return;
+      const d=G.dice[i]; const idx=rand(d.faces.length); d.current=d.faces[idx]; d.currentPower=(d.power||1)+(d.current.key==='SKULL'?1:0);
+      G.turnCache.rerolls--; log(`Rerolled ${d.name}: ${d.current.icon}`);
+      G.turnCache.lastDiePower=G.dice.reduce((m,d)=>m+(d.currentPower||0),0); refs.btnReroll.disabled=(G.turnCache.rerolls<=0);
+      updateStats();
+    }
+
+    function endTurn(){ refs.btnEndTurn.disabled=true; refs.btnRoll.disabled=true; refs.btnReroll.disabled=true; enemyTurn(); }
+
+    function enemyTurn(){
+      G.turn='enemy'; updateStats();
+      if(G.enemy.intent==='Strike'){ dealDamage(G,'player', G.enemy.ATK+rand(3), 'Enemy strike'); }
+      else if(G.enemy.intent==='Guard'){ gainBlock(G,'enemy',6); }
+      else { applyHex(G,'player',2); }
+      chooseEnemyIntent(); checkEnd(); if(G.player.hp>0 && G.enemy.hp>0){ startPlayerTurn(); }
+    }
+
+    function drawCards(n){
+      for(let i=0;i<n;i++){ if(G.drawPile.length===0){ G.drawPile=shuffle(G.discard); G.discard=[]; } if(G.drawPile.length===0) return; G.hand.push(G.drawPile.pop()); }
+      if(refs.drawCount) refs.drawCount.textContent=G.drawPile.length;
+    }
+
+    function playCard(index){
+      const name=G.hand[index]; const def=CARD_DB[name]; if(G.energy<def.cost) return; G.energy-=def.cost; def.play(G);
+      const [c]=G.hand.splice(index,1); G.discard.push(c); updateStats(); checkEnd();
+    }
+
+    function dealDamage(G,target,amount,label='Hit'){
+      const t=target==='enemy'?G.enemy:G.player; const sprite=target==='enemy'?refs.enemySprite:refs.playerSprite;
+      let mult=1; if(target==='enemy' && G.enemy.hex>0) mult+=0.25; const raw=Math.round(amount*mult);
+      let dmg=Math.max(0, raw-(t.block||0)); const blockUsed=Math.min(t.block||0, raw);
+      t.block=Math.max(0,(t.block||0)-raw); t.hp=Math.max(0, Math.min(t.hpMax, t.hp-dmg));
+      sprite.classList.add('flash','shake'); popParticles(sprite,8); floatText(sprite,`-${dmg}`,'#ffd2d2'); setTimeout(()=>{sprite.classList.remove('flash','shake')},250);
+      log(`${label}: ${raw} (${blockUsed} blocked) → ${dmg} dmg to ${target}`); updateStats();
+    }
+    function gainBlock(G,who,amount){ const t=(who==='enemy'?G.enemy:G.player); const sprite=who==='enemy'?refs.enemySprite:refs.playerSprite; t.block=(t.block||0)+amount; floatText(sprite,`+${amount} BLK`,'#9fd1ff'); log(`${who} gains ${amount} block.`); updateStats(); }
+    function applyHex(G,who,stacks){ const t=(who==='enemy'?G.enemy:G.player); const aura=who==='enemy'?refs.enemyAura:refs.playerAura; t.hex=(t.hex||0)+stacks; aura.classList.add('hex'); floatText((who==='enemy'?refs.enemySprite:refs.playerSprite),`HEX ${t.hex}`,'#c9b3ff'); log(`${who} is hexed (${t.hex}).`); updateStats(); }
+
+    function addSpectralDie(){ if(G.spectralCount>=2){ log('The air is saturated with echoes. No more spectral dice.'); return; } const d=makeSpectralDie(); G.dice.push(d); G.spectralCount++; renderDice(); log('A Spectral Echo joins your cup.'); }
+
+    function onVictory(){ log('— Victory! —'); showLoot(); }
+    function showLoot(){
+      refs.lootChoices.innerHTML=''; const options=[ {type:'die', item: cloneDie(pick(BASE_DICE_POOL))}, {type:'card', item: pick(Object.keys(CARD_DB))}, {type:'relic', item:{name:'Obsidian Rosary', effect:'+1 reroll each turn'}} ];
+      options.forEach(opt=>{ const btn=document.createElement('button'); btn.className='btn'; btn.style.width='100%'; if(opt.type==='die') btn.innerHTML=`Die: <b>${opt.item.name}</b> <span class="pill">${opt.item.affix}</span>`; if(opt.type==='card') btn.innerHTML=`Card: <b>${opt.item}</b>`; if(opt.type==='relic') btn.innerHTML=`Relic: <b>${opt.item.name}</b> <span class="pill">${opt.item.effect}</span>`; btn.addEventListener('click',()=>{ if(opt.type==='die') G.dice.push(opt.item); if(opt.type==='card'){ G.discard.push(opt.item); } if(opt.type==='relic'){ G.baseEnergy=3; G.rerolls=2; } refs.lootBox.style.display='none'; spawnEnemy(); startPlayerTurn(true); }); refs.lootChoices.appendChild(btn); });
+      refs.lootBox.style.display='flex';
+    }
+
+    function checkEnd(){ if(G.enemy.hp<=0){ onVictory(); return; } if(G.player.hp<=0){ log('— You die. The run ends. —'); alert('You died! New run starting.'); newRun(); } }
+
+    newRun();
+  </script>
+</body>
+</html>
