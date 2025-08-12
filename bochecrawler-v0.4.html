@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>BocheCrawler v0.4 — Blinds + Grit/Fury</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <style>
+    :root{
+      --bg:#0b0b0c; --panel:#121215; --ink:#e7e3da; --muted:#a7a39a; --accent:#d84f4f; --gold:#c09b43; --good:#58c97c; --bad:#d45b5b; --blue:#4fa3d8; --vio:#7a5bd4;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:radial-gradient(1200px 700px at 50% -200px,#15151a,#0b0b0c);color:var(--ink);
+      font-family: ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      display:flex; align-items:center; justify-content:center;}
+    #game{width:100%; max-width:560px; height:100svh; background:linear-gradient(180deg,#0b0b0c 0%, #0e0e10 40%, #111116 100%);
+      border:1px solid #222; border-radius:18px; box-shadow:0 10px 40px rgba(0,0,0,.6); overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative}
+    .topbar{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:#0f0f12; border-bottom:1px solid #1f1f24; position:sticky; top:0; z-index:5}
+    .title{font-weight:800; letter-spacing:.2px; font-size:14px}
+    .pill{padding:3px 6px; border:1px solid #333; border-radius:999px; font-size:11px; color:var(--muted)}
+    .btn{background:#1a1a20;color:var(--ink);border:1px solid #2a2a33;padding:8px 10px;border-radius:12px;font-weight:700;font-size:12px;cursor:pointer}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+
+    .arena{display:grid; grid-template-rows: 160px auto auto; gap:10px; padding:10px 12px}
+    .stage{display:grid; grid-template-columns: 1fr; gap:8px; background:#0e0e12; border:1px solid #24242a; border-radius:16px; padding:10px}
+    .stageTop{display:flex; align-items:center; justify-content:space-between}
+    .enemyBox{display:flex; align-items:center; gap:10px}
+    .sprite{height:84px; width:84px; border-radius:10px; background:repeating-linear-gradient(90deg,#120c0c 0 4px,#150e0e 4px 8px); border:1px solid #23232b; display:flex; align-items:center; justify-content:center; font-size:28px; position:relative}
+    .hpWrap{flex:1}
+    .hpbar{position:relative; height:14px; background:#1a1a20; border:1px solid #2a2a33; border-radius:999px; overflow:hidden}
+    .hpfill{position:absolute; inset:0; width:100%; background:linear-gradient(90deg, #e87070, #b14040)}
+    .hud{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .stat{font-size:12px; color:var(--muted)}
+
+    .panel{background:var(--panel); border:1px solid #24242a; border-radius:16px; padding:10px}
+    .row{display:flex; align-items:center; justify-content:space-between; gap:10px}
+    .col{display:flex; flex-direction:column; gap:8px}
+
+    /* Balatro-like joker bar */
+    .jokers{display:flex; gap:10px; overflow-x:auto; padding:8px 6px; background:#101015; border-radius:12px; scroll-snap-type:x mandatory}
+    .joker{width:150px; flex:0 0 auto; background:#141419; border:1px solid #2a2a33; border-radius:14px; padding:10px; scroll-snap-align:start}
+    .joker h4{margin:0 0 2px 0; font-size:12px; color:var(--muted)}
+    .pip{font-size:26px; font-weight:800}
+    .meta{font-size:11px; color:var(--muted)}
+    .joker.spectral{outline:1px dashed var(--gold); box-shadow:0 0 10px rgba(192,155,67,.25)}
+
+    /* Cards hand */
+    .handWrap{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px}
+    .hand{display:flex; gap:8px; overflow-x:auto; padding:6px 4px; min-height:98px}
+    .card{min-width:160px; background:#141419; border:1px solid #2a2a33; border-radius:14px; padding:10px; text-align:left}
+    .card .name{font-weight:700; font-size:13px}
+    .card .desc{font-size:11px; color:var(--muted)}
+
+    .log{max-height:160px; overflow:auto; font-size:12px; line-height:1.35; color:var(--muted); border-top:1px dashed #2a2a33; padding-top:6px}
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div class="topbar">
+      <div class="title">BocheCrawler v0.4 — Blinds</div>
+      <div class="hud">
+        <span class="pill">Ante <b id="ante">1</b></span>
+        <span class="pill">Blind <b id="blind">1/3</b></span>
+        <span class="pill">Hands <b id="hands">4</b></span>
+        <span class="pill">Energy <b id="energy">3</b></span>
+        <button class="btn" id="btnNew">New Run</button>
+      </div>
+    </div>
+
+    <div class="arena">
+      <div class="stage">
+        <div class="stageTop">
+          <div class="enemyBox">
+            <div class="sprite" id="enemySprite">🩸</div>
+            <div class="hpWrap">
+              <div class="row" style="margin-bottom:4px">
+                <div class="stat"><b id="enemyName">Veil-Warden</b></div>
+                <div class="stat">Mod: <b id="blindMod">—</b></div>
+              </div>
+              <div class="hpbar"><div class="hpfill" id="enemyHPFill"></div></div>
+              <div class="stat">HP <b id="enemyHP">50</b> / <b id="enemyHPMax">50</b></div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="stat">Grit: <b id="grit">0</b> • Fury: <b id="fury">0</b>x</div>
+            <div class="row">
+              <button class="btn" id="btnRoll">Roll</button>
+              <button class="btn" id="btnResolve" disabled>Resolve</button>
+              <button class="btn" id="btnEndHand" disabled>End Hand</button>
+              <button class="btn" id="btnAddSpectral">+Spectral</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="row" style="margin-bottom:6px">
+          <div class="stat">Dice (Jokers)</div>
+          <div class="stat">Rerolls <b id="rerolls">1</b></div>
+        </div>
+        <div class="jokers" id="diceTray"></div>
+      </div>
+
+      <div class="panel">
+        <div class="handWrap">
+          <div class="stat">Hand</div>
+          <div class="stat">Draw pile <b id="drawCount">0</b></div>
+        </div>
+        <div class="hand" id="hand"></div>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Core helpers ----------
+    const logEl=document.getElementById('log');
+    const L=(m)=>{ const p=document.createElement('p'); p.textContent=m; logEl.prepend(p); }
+    const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+    const R=(n)=>Math.floor(Math.random()*n);
+    const pick=(a)=>a[R(a.length)];
+    const $=(id)=>document.getElementById(id);
+
+    // ---------- Dice, Cards, Blinds ----------
+    const FACE={SWORD:{k:'SWORD',i:'⚔️'}, SHIELD:{k:'SHIELD',i:'🛡️'}, EYE:{k:'EYE',i:'👁️'}, HEX:{k:'HEX',i:'☠️'}, WILD:{k:'WILD',i:'⭐'}};
+    const BASE_DICE=[
+      {name:'Initiate Die', faces:[FACE.SWORD,FACE.SWORD,FACE.SHIELD,FACE.EYE,FACE.WILD,FACE.SHIELD], power:1, affix:'Common', spectral:false, effect:{type:'fury_per_eye', v:0.25}},
+      {name:'Omen-Carved', faces:[FACE.SWORD,FACE.SWORD,FACE.HEX,FACE.SWORD,FACE.EYE,FACE.HEX], power:1, affix:'Uncommon', spectral:false, effect:{type:'grit_on_hex', v:8}},
+      {name:'Blessed Cube', faces:[FACE.SWORD,FACE.WILD,FACE.SHIELD,FACE.EYE,FACE.SWORD,FACE.SHIELD], power:1, affix:'Uncommon', spectral:false, effect:{type:'flat_fury', v:0.2}},
+    ];
+    function spectralDie(){ return {name:'Spectral Echo', faces:[FACE.WILD,FACE.SWORD,FACE.EYE,FACE.HEX,FACE.WILD,FACE.SWORD], power:2, affix:'Spectral', spectral:true, effect:{type:'fury_per_wild', v:0.5}}; }
+
+    const CARD_DB={
+      Lunge:{cost:1, text:'+20 Grit.', play:G=>{G.turn.grit+=20;}},
+      Guard:{cost:1, text:'+10 Grit and +1 reroll.', play:G=>{G.turn.grit+=10; G.turn.rerolls++;}},
+      HexBolt:{cost:1, text:'Add Hex tag (+10 Grit if a die shows ☠️).', play:G=>{G.turn.tags.add('HEX_TAG');}},
+      Focus:{cost:1, text:'+0.3 Fury.', play:G=>{G.turn.fury+=0.3;}},
+      Convert:{cost:1, text:'Turn one 🛡️ face to ⚔️ this hand.', play:G=>{const d=G.dice.find(d=>d.current && d.current.k==='SHIELD'); if(d){d.current=FACE.SWORD; L('A shield becomes a blade.');}}},
+    };
+    function starterDeck(){ return ['Lunge','Lunge','Lunge','Guard','Guard','HexBolt','Focus','Convert','Lunge','Guard']; }
+
+    const BLINDS=[
+      {name:'Small Blind', mod:'None', hp: (ante)=> 40 + (ante-1)*20},
+      {name:'Big Blind', mod:'Thick Hide (+10% DR)', hp: (ante)=> 65 + (ante-1)*30, rule:(G)=>{G.enemy.dr=0.10;}},
+      {name:'Boss', mod:'Dread Sigil (+1 Hex each resolve)', hp: (ante)=> 90 + (ante-1)*45, rule:(G)=>{G.enemy.onResolveHex=1;}},
+    ];
+    const ENEMY_SPRITES=['🩸','🦴','🐺','🕯️','🗡️'];
+
+    // ---------- Game State ----------
+    const G={
+      ante:1, blindIndex:0,
+      handsMax:4, hands:4,
+      energy:3, baseEnergy:3,
+      dice:[], hand:[], draw:[], discard:[],
+      enemy:{name:'', hp:0, hpMax:0, dr:0, onResolveHex:0, sprite:'🩸'},
+      turn:{ grit:0, fury:0, rerolls:1, tags:new Set() }
+    };
+
+    // ---------- Setup ----------
+    function newRun(){
+      G.ante=1; G.blindIndex=0; G.handsMax=4; G.energy=G.baseEnergy=3;
+      G.dice=[cloneDie(BASE_DICE[0]), cloneDie(BASE_DICE[1]), cloneDie(BASE_DICE[2])];
+      G.draw=shuffle(starterDeck()); G.discard=[]; G.hand=[];
+      startBlind();
+      L('— New run. The blinds descend. —');
+    }
+
+    function startBlind(){
+      G.hands=G.handsMax;
+      const b=BLINDS[G.blindIndex];
+      const hp=b.hp(G.ante);
+      Object.assign(G.enemy,{name:b.name, hp:hp, hpMax:hp, dr:0, onResolveHex:0, sprite:pick(ENEMY_SPRITES)});
+      if(b.rule) b.rule(G);
+      G.turn={grit:0,fury:0,rerolls:1,tags:new Set()};
+      updateUI();
+      drawCards(3);
+      renderDice();
+      L(`— ${b.name} (Ante ${G.ante}) — ${b.mod}`);
+    }
+
+    // ---------- Utilities ----------
+    function cloneDie(d){return JSON.parse(JSON.stringify(d));}
+    function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]} return a}
+
+    // ---------- Rendering ----------
+    const refs={
+      enemySprite:$('enemySprite'), enemyName:$('enemyName'),
+      enemyHP:$('enemyHP'), enemyHPMax:$('enemyHPMax'), enemyHPFill:$('enemyHPFill'), blindMod:$('blindMod'),
+      diceTray:$('diceTray'), hand:$('hand'),
+      ante:$('ante'), blind:$('blind'), hands:$('hands'), energy:$('energy'), rerolls:$('rerolls'),
+      grit:$('grit'), fury:$('fury'), drawCount:$('drawCount'),
+      btnRoll:$('btnRoll'), btnResolve:$('btnResolve'), btnEndHand:$('btnEndHand'), btnAddSpectral:$('btnAddSpectral')
+    };
+
+    function updateUI(){
+      refs.ante.textContent=G.ante;
+      refs.blind.textContent=(G.blindIndex+1)+'/'+BLINDS.length;
+      refs.hands.textContent=G.hands;
+      refs.energy.textContent=G.energy;
+      refs.rerolls.textContent=G.turn.rerolls;
+      refs.grit.textContent=Math.round(G.turn.grit);
+      refs.fury.textContent=(G.turn.fury).toFixed(2);
+      refs.enemyName.textContent=G.enemy.name;
+      refs.enemyHP.textContent=G.enemy.hp; refs.enemyHPMax.textContent=G.enemy.hpMax;
+      refs.enemyHPFill.style.width=(G.enemy.hp/G.enemy.hpMax*100)+'%';
+      refs.enemySprite.textContent=G.enemy.sprite;
+      refs.blindMod.textContent=BLINDS[G.blindIndex].mod;
+      refs.drawCount.textContent=G.draw.length;
+    }
+
+    function renderDice(){
+      refs.diceTray.innerHTML='';
+      G.dice.forEach((d,idx)=>{
+        const el=document.createElement('div'); el.className='joker'+(d.spectral?' spectral':''); el.dataset.idx=idx;
+        const h4=document.createElement('h4'); h4.textContent=d.name; el.appendChild(h4);
+        const face=document.createElement('div'); face.className='pip'; face.textContent=d.current?d.current.i:'—'; el.appendChild(face);
+        const meta=document.createElement('div'); meta.className='meta';
+        meta.textContent = `${d.affix} • eff ${d.effect.type}`; el.appendChild(meta);
+        el.addEventListener('click',()=>{ G.selDie=idx; });
+        refs.diceTray.appendChild(el);
+      });
+    }
+
+    function renderHand(){
+      refs.hand.innerHTML='';
+      if(!G.hand.length){ const tip=document.createElement('div'); tip.className='stat'; tip.style.padding='4px'; tip.textContent='(No cards in hand)'; refs.hand.appendChild(tip); return; }
+      G.hand.forEach((name,i)=>{
+        const def=CARD_DB[name];
+        const btn=document.createElement('button'); btn.className='card';
+        btn.innerHTML=`<div class="name">${name} <span class="pill">${def.cost}</span></div><div class="desc">${def.text}</div>`;
+        btn.disabled=(G.energy<def.cost);
+        btn.addEventListener('click',()=> playCard(i));
+        refs.hand.appendChild(btn);
+      });
+    }
+
+    // ---------- Turn / Hand Flow ----------
+    function drawCards(n){
+      for(let i=0;i<n;i++){
+        if(G.draw.length===0){ G.draw=shuffle(G.discard); G.discard=[]; }
+        if(G.draw.length===0) break;
+        G.hand.push(G.draw.pop());
+      }
+      updateUI(); renderHand();
+    }
+
+    function rollDice(){
+      // roll all dice; apply on-roll turn buffs
+      G.dice.forEach(d=>{
+        const idx=R(d.faces.length); d.current=d.faces[idx];
+        if(d.effect?.type==='fury_per_eye' && d.current.k==='EYE'){ G.turn.fury += d.effect.v; }
+        if(d.effect?.type==='fury_per_wild' && d.current.k==='WILD'){ G.turn.fury += d.effect.v; }
+        if(d.effect?.type==='flat_fury'){ G.turn.fury += d.effect.v; }
+        if(d.effect?.type==='grit_on_hex' && (d.current.k==='HEX' || G.turn.tags.has('HEX_TAG')) ){ G.turn.grit += d.effect.v; }
+      });
+      G.turn.rerolls = Math.max(0, G.turn.rerolls-1);
+      refs.btnResolve.disabled=false;
+      updateUI(); renderDice();
+      L('You roll the bones…');
+    }
+
+    function resolveHand(){
+      // Damage = round( Grit * (1 + Fury) ), then reset hand state; decrement hands; draw up
+      const dmg = Math.round(G.turn.grit * (1 + G.turn.fury));
+      const reduced = Math.round( dmg * (1 - (G.enemy.dr || 0)) );
+      G.enemy.hp = clamp(G.enemy.hp - reduced, 0, G.enemy.hpMax);
+      L(`Resolve → Grit ${Math.round(G.turn.grit)} × (1+${G.turn.fury.toFixed(2)}) = ${dmg} → after DR ${reduced}`);
+      // Boss passive
+      if(G.enemy.onResolveHex){ L('Dread Sigil pulses. +Hex burden.'); G.turn.grit += 10; }
+      // reset per hand
+      endHand(true);
+      checkBlindEnd();
+    }
+
+    function endHand(fromResolve=false){
+      G.hands = Math.max(0, G.hands - (fromResolve?1:1));
+      G.energy = G.baseEnergy;
+      G.turn={grit:0,fury:0,rerolls:1,tags:new Set()};
+      // discard hand
+      while(G.hand.length){ G.discard.push(G.hand.pop()); }
+      drawCards(3);
+      refs.btnResolve.disabled=true;
+      updateUI();
+    }
+
+    function playCard(i){
+      const name=G.hand[i]; const def=CARD_DB[name];
+      if(G.energy<def.cost) return;
+      G.energy-=def.cost;
+      def.play(G);
+      const [c]=G.hand.splice(i,1); G.discard.push(c);
+      updateUI(); renderHand();
+    }
+
+    function checkBlindEnd(){
+      if(G.enemy.hp<=0){
+        L(`— ${G.enemy.name} beaten! —`);
+        // proceed to next blind or next ante
+        G.blindIndex++;
+        if(G.blindIndex>=BLINDS.length){
+          G.blindIndex=0; G.ante++; L(`— Ante ${G.ante} begins. —`);
+        }
+        startBlind();
+      } else if(G.hands<=0){
+        alert('Out of hands! Blind resets.'); startBlind();
+      }
+    }
+
+    function addSpectral(){
+      if(G.dice.length>=5){L('You cannot carry more echoes.'); return;}
+      G.dice.push(spectralDie()); renderDice(); L('A Spectral Echo joins you.');
+    }
+
+    // ---------- Wire buttons ----------
+    $('btnNew').addEventListener('click', newRun);
+    $('btnRoll').addEventListener('click', ()=>{
+      if(G.turn.rerolls<=0){ L('No rerolls left.'); return; }
+      rollDice();
+    });
+    $('btnResolve').addEventListener('click', resolveHand);
+    $('btnEndHand').addEventListener('click', ()=> endHand(false));
+    $('btnAddSpectral').addEventListener('click', addSpectral);
+
+    // ---------- Boot ----------
+    newRun();
+  </script>
+</body>
+</html>
