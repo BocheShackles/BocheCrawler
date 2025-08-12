@@ -1,0 +1,42 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BocheCrawler v0.2.1 — Pokemon layout + Joker dice (Fixed Start)</title>
+<style>
+  body { background-color: #111; color: white; font-family: sans-serif; text-align: center; }
+  button { margin: 5px; padding: 10px; font-size: 16px; }
+  .dice, .card { display: inline-block; border: 1px solid white; padding: 10px; margin: 5px; }
+</style>
+</head>
+<body>
+<h1>BocheCrawler v0.2.1</h1>
+<p>Fixed starting loadout: 3 dice + 3 cards every run</p>
+<div id="game"></div>
+<button onclick="newRun()">New Run</button>
+<script>
+let dice = [];
+let cards = [];
+
+function newRun() {
+    // Reset arrays
+    dice = ["Initiate Die", "Blessed Cube", "Omen-Carved"];
+    cards = ["Strike", "Defend", "Hexbolt"];
+    render();
+}
+
+function render() {
+    const gameDiv = document.getElementById('game');
+    gameDiv.innerHTML = "<h2>Dice</h2>" +
+        dice.map(d => `<div class='dice'>🎲 ${d}</div>`).join('') +
+        "<h2>Cards</h2>" +
+        cards.map(c => `<div class='card'>🃏 ${c}</div>`).join('');
+}
+
+// Initialize
+newRun();
+</script>
+</body>
+</html>
