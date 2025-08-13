@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>BocheCrawler v0.8 — Gritty Build</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  :root{
+    --bg:#0a0a0c; --panel:#121216; --ink:#eee8de; --muted:#aaa59a; --line:#24242b;
+    --accent:#d84f4f; --gold:#caa24b; --good:#66d08b; --bad:#e06464;
+    --r-common:#6b6b6b; --r-uncommon:#3b6f52; --r-rare:#345a8f; --r-mythic:#8e6c1b; --r-echo:#c4b07a;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:radial-gradient(1400px 900px at 50% -200px,#15151a,#0a0a0c);color:var(--ink);
+    font-family: ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;}
+  #game{width:100%; max-width:980px; height:100svh; margin:0 auto; display:flex; flex-direction:column;}
+  .topbar{display:flex; gap:8px; align-items:center; justify-content:space-between; padding:10px 12px; background:#0e0e12; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:20}
+  .title{font-weight:900; letter-spacing:.2px; font-size:14px}
+  .hud{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .pill{padding:4px 8px; border:1px solid #333; border-radius:999px; font-size:12px; color:var(--muted); background:#141418}
+  .btn{background:#18181f;color:var(--ink);border:1px solid #2c2c34;padding:8px 12px;border-radius:12px;font-weight:800;font-size:12px;cursor:pointer}
+  .btn:disabled{opacity:.55;cursor:not-allowed}
+  .btn.small{padding:6px 8px; font-size:11px; border-radius:10px}
+  .danger{border-color:#4a2222; background:#201112}
+  .good{border-color:#204a2e; background:#132018}
+  .ghost{background:transparent}
+  .flex{display:flex; gap:8px; align-items:center}
+  .sp{justify-content:space-between}
+  .col{display:flex; flex-direction:column; gap:8px}
+  .row{display:flex; gap:8px; align-items:center}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:10px}
+
+  /* Arena: landscape-first layout */
+  .arena{display:grid; grid-template-columns:1fr 1fr; grid-template-rows:auto 1fr auto; gap:10px; padding:10px 12px; flex:1; overflow:auto}
+  .field{grid-column:1 / span 2; display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .side{background:#0f0f13; border:1px solid var(--line); border-radius:16px; padding:10px; display:grid; grid-template-rows:auto 1fr auto; gap:6px}
+  .sprite{height:148px; border-radius:14px; background:linear-gradient(180deg,#1a1a1f,#101015); border:1px solid #2a2a33; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden}
+  .sprite .label{position:absolute; top:6px; left:6px; font-size:11px; color:#cfc7b7; background:#141418; border:1px solid var(--line); padding:2px 6px; border-radius:8px}
+  .hpbar{position:relative; height:14px; background:#16161b; border:1px solid #2a2a33; border-radius:999px; overflow:hidden}
+  .hpfill{position:absolute; inset:0; width:100%; background:linear-gradient(90deg, #e87070, #b14040)}
+
+  /* Dice tray (Jokers) with mini art */
+  .tray{grid-column:1 / span 2; display:flex; gap:10px; overflow:auto; padding:8px 6px; background:#101015; border-radius:14px}
+  .dieCard{min-width:170px; background:#141419; border:1px solid #2a2a33; border-radius:14px; padding:8px}
+  .dieRow{display:grid; grid-template-columns:48px 1fr; gap:8px; align-items:center}
+  .dieMeta{font-size:11px; color:var(--muted)}
+  .rar{font-weight:900; text-transform:capitalize}
+  .rar.common{color:var(--r-common)}
+  .rar.uncommon{color:#8fd2a7}
+  .rar.rare{color:#99baff}
+  .rar.mythic{color:#ffd46f}
+  .rar.echo{color:#ffe6a8}
+  .badge{display:inline-block; padding:1px 6px; border-radius:999px; border:1px solid var(--line); background:#17171a; font-size:10px; margin-left:6px}
+
+  /* Cards */
+  .handWrap{grid-column:1 / span 2; display:flex; align-items:center; justify-content:space-between}
+  .hand{grid-column:1 / span 2; display:flex; flex-wrap:wrap; gap:8px; min-height:120px}
+  .card{width:148px; background:#15151a; border:1px solid #2a2a33; border-radius:14px; padding:8px; text-align:left; position:relative}
+  .card .cost{position:absolute; top:6px; right:6px; font-weight:900; font-size:12px; padding:2px 6px; border-radius:8px; border:1px solid var(--line); background:#1b1b20}
+  .card .name{font-weight:800; font-size:13px; margin-bottom:2px}
+  .card .desc{font-size:11px; color:var(--muted); min-height:34px}
+
+  .log{grid-column:1 / span 2; max-height:160px; overflow:auto; font-size:12px; line-height:1.35; color:var(--muted); border-top:1px dashed #2a2a33; padding-top:6px}
+
+  /* Overlays / modals */
+  .overlay{position:fixed; inset:0; background:rgba(0,0,0,.72); display:none; align-items:center; justify-content:center; padding:16px; z-index:100}
+  .modal{background:#131318; border:1px solid #2a2a33; border-radius:16px; width:100%; max-width:540px; padding:12px}
+  .choices{display:grid; grid-template-columns:1fr; gap:8px}
+  .choice{background:#15151b; border:1px solid #2a2a33; border-radius:12px; padding:10px; text-align:left}
+  .choice .row{align-items:flex-start}
+  .price{font-weight:900}
+  .mini{width:42px;height:42px; border-radius:8px; border:1px solid #2a2a33; overflow:hidden}
+
+  /* Teeth pop */
+  .teethPop{position:absolute; transform:translate(-50%,-50%); left:50%; top:50%; font-weight:900; text-shadow:0 2px 8px rgba(0,0,0,.6); pointer-events:none; animation:teethFloat .8s ease forwards}
+  @keyframes teethFloat { 0%{opacity:0; transform:translate(-50%,-30%) scale(.9)} 20%{opacity:1} 100%{opacity:0; transform:translate(-50%,-90%) scale(1.08)} }
+  .popAnim{animation:pop .25s ease}
+  @keyframes pop { 0%{transform:scale(1)} 50%{transform:scale(1.12)} 100%{transform:scale(1)} }
+
+  /* Responsive tweaks */
+  @media (max-width:780px){
+    .arena{grid-template-columns:1fr; grid-template-rows:auto auto 1fr auto auto}
+    .field{grid-column:1; grid-template-columns:1fr; }
+    .hand{justify-content:center}
+  }
+</style>
+</head>
+<body>
+<div id="game">
+  <div class="topbar">
+    <div class="title">BocheCrawler v0.8 — Gritty Build</div>
+    <div class="hud">
+      <span class="pill">Cave <b id="cave">1</b></span>
+      <span class="pill">Beast <b id="beast">1/3</b></span>
+      <span class="pill">Teeth 🦷 <b id="teeth">0</b></span>
+      <span class="pill">Hands <b id="hands">4</b></span>
+      <span class="pill">Energy <b id="energy">3</b></span>
+    </div>
+    <div class="row">
+      <button class="btn small" id="btnManage">Manage Dice</button>
+      <button class="btn small" id="btnNew">New Run</button>
+    </div>
+  </div>
+
+  <div class="arena">
+    <div class="field">
+      <!-- Enemy side -->
+      <div class="side">
+        <div class="sprite" id="enemySprite">
+          <span class="label" id="enemyName">Scout Beast</span>
+          <!-- Enemy SVG -->
+          <svg viewBox="0 0 200 140" width="100%" height="100%">
+            <defs>
+              <linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0" stop-color="#1b1b21"/>
+                <stop offset="1" stop-color="#0e0e12"/>
+              </linearGradient>
+            </defs>
+            <rect x="0" y="0" width="200" height="140" fill="url(#g1)"/>
+            <path d="M10,120 Q60,90 90,110 T190,115 L190,140 L10,140 Z" fill="#0d0d11"/>
+            <path d="M60,115 C85,95 95,70 120,75 145,80 160,110 170,120 L150,120 C140,105 135,95 120,98 105,101 95,115 80,120 Z" fill="#1a1a22"/>
+            <circle cx="122" cy="94" r="6" fill="#b34a4a"/>
+            <circle cx="103" cy="93" r="5" fill="#cfc7b7"/>
+          </svg>
+        </div>
+        <div class="hpbar"><div class="hpfill" id="enemyHPFill"></div></div>
+        <div class="row sp">
+          <div class="pill">Omen: <b id="beastMod">—</b></div>
+          <div class="pill">HP <b id="enemyHP">50</b>/<b id="enemyHPMax">50</b></div>
+        </div>
+      </div>
+
+      <!-- Player side -->
+      <div class="side">
+        <div class="sprite">
+          <span class="label">Crawler</span>
+          <!-- Player SVG -->
+          <svg viewBox="0 0 200 140" width="100%" height="100%">
+            <rect x="0" y="0" width="200" height="140" fill="#101015"/>
+            <path d="M15,125 L185,125" stroke="#1f1f26" stroke-width="6"/>
+            <path d="M70,120 C78,90 85,60 100,60 C115,60 125,90 130,120 Z" fill="#1a1a22"/>
+            <rect x="88" y="50" width="24" height="10" fill="#23232b" transform="rotate(-15 100 55)"/>
+            <rect x="115" y="70" width="26" height="16" fill="#23232b" transform="rotate(15 128 78)"/>
+            <circle cx="105" cy="72" r="4" fill="#cfc7b7"/>
+          </svg>
+        </div>
+        <div class="row sp">
+          <div class="pill">Gravegrit: <b id="grit">0</b></div>
+          <div class="pill">Oathfire: <b id="oath">0</b>x</div>
+        </div>
+        <div class="row">
+          <button class="btn" id="btnRoll">Roll</button>
+          <button class="btn" id="btnResolve" disabled>Resolve</button>
+          <button class="btn" id="btnEndHand" disabled>End Hand</button>
+          <button class="btn ghost" id="btnShuffle">Shuffle Hand (1)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dice tray -->
+    <div class="tray" id="diceTray"></div>
+
+    <!-- Cards -->
+    <div class="handWrap">
+      <div class="row">
+        <div class="pill">Draw <b id="drawCount">0</b></div>
+        <div class="pill">Rerolls <b id="rerolls">1</b></div>
+      </div>
+      <div class="row">
+        <span class="pill" id="shopTeethHint" style="display:none">🦷 <b id="shopTeeth">0</b></span>
+      </div>
+    </div>
+    <div class="hand" id="hand"></div>
+
+    <!-- Log -->
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<!-- Shop -->
+<div class="overlay" id="shop">
+  <div class="modal">
+    <div class="row sp">
+      <h3 style="margin:0">Burrow-Market</h3>
+      <span class="pill">🦷 <b id="teethShop">0</b></span>
+    </div>
+    <div class="choices" id="shopChoices"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="btnSkipShop">Leave</button>
+    </div>
+  </div>
+</div>
+
+<!-- Preview -->
+<div class="overlay" id="preview">
+  <div class="modal">
+    <h3 style="margin:0 0 6px 0">Loadout Preview</h3>
+    <div id="previewBody" class="choices"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="btnPreviewContinue">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sell Modal -->
+<div class="overlay" id="sell">
+  <div class="modal">
+    <h3 style="margin:0 0 6px 0">Sell a Die</h3>
+    <div class="choices" id="sellChoices"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="btnSellCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Dice -->
+<div class="overlay" id="manage">
+  <div class="modal">
+    <div class="row sp">
+      <h3 style="margin:0">Manage Dice</h3>
+      <button class="btn small" id="btnManageClose">Close</button>
+    </div>
+    <div class="choices" id="manageChoices"></div>
+  </div>
+</div>
+
+<script>
+// ===== Helpers =====
+const $ = id => document.getElementById(id);
+const L = m => { const p=document.createElement('p'); p.textContent=m; $('log').prepend(p); };
+const R = n => Math.floor(Math.random()*n);
+const pick = a => a[R(a.length)];
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function clone(x){ return JSON.parse(JSON.stringify(x)); }
+
+// ===== Faces / Rarity =====
+const FACE={SWORD:{k:'SWORD',i:'⚔️'},SHIELD:{k:'SHIELD',i:'🛡️'},EYE:{k:'EYE',i:'👁️'},HEX:{k:'HEX',i:'☠️'},WILD:{k:'WILD',i:'⭐'}};
+const RAR={COMMON:'common',UNCOMMON:'uncommon',RARE:'rare',MYTHIC:'mythic'};
+
+// ===== Dice Pool (Echo is overlay, can appear on any shop die) =====
+const DICE_BASE = [
+  {name:'Initiate Die',    faces:[FACE.SWORD,FACE.SWORD,FACE.SHIELD,FACE.EYE,FACE.WILD,FACE.SHIELD], affix:RAR.COMMON, effect:{type:'fury_per_eye', v:0.25}},
+  {name:'Stitched Cube',   faces:[FACE.SWORD,FACE.SHIELD,FACE.SHIELD,FACE.EYE,FACE.SWORD,FACE.SHIELD], affix:RAR.COMMON, effect:{type:'flat_grit', v:6}},
+  {name:'Omen-Carved',     faces:[FACE.SWORD,FACE.SWORD,FACE.HEX,FACE.SWORD,FACE.EYE,FACE.HEX],       affix:RAR.UNCOMMON, effect:{type:'grit_on_hex', v:8}},
+  {name:'Blessed Cube',    faces:[FACE.SWORD,FACE.WILD,FACE.SHIELD,FACE.EYE,FACE.SWORD,FACE.SHIELD],  affix:RAR.UNCOMMON, effect:{type:'flat_fury', v:0.2}},
+  {name:'Rot Die',         faces:[FACE.HEX,FACE.SWORD,FACE.HEX,FACE.SHIELD,FACE.EYE,FACE.HEX],        affix:RAR.UNCOMMON, effect:{type:'reduce_maxhp_on_hex', v:5}},
+  {name:'Bone Fracture',   faces:[FACE.SWORD,FACE.SWORD,FACE.SWORD,FACE.EYE,FACE.WILD,FACE.SHIELD],   affix:RAR.RARE, effect:{type:'fury_per_sword', v:0.4}},
+  {name:'Gilded Jaw',      faces:[FACE.SWORD,FACE.EYE,FACE.SHIELD,FACE.SWORD,FACE.WILD,FACE.SHIELD],  affix:RAR.RARE, effect:{type:'teeth_on_resolve', v:2}},
+  {name:'Hollow Face',     faces:[FACE.WILD,FACE.SWORD,FACE.WILD,FACE.SWORD,FACE.WILD,FACE.SWORD],    affix:RAR.MYTHIC, effect:{type:'sword_amp_but_hand_penalty', v:0.5}},
+];
+
+// ===== Cards (1/2/3-cost including rarity synergy) =====
+const CARD_DB={
+  // 1-cost
+  'Bone Toss': {cost:1, text:'+10 Gravegrit, draw 1', play:G=>{G.turn.grit+=10; G.turn.drawNext+=1;}},
+  'Mire Shield': {cost:1, text:'+15 Gravegrit & -10% enemy DR (this hand)', play:G=>{G.turn.grit+=15; G.turn.lowerDR=Math.max(G.turn.lowerDR||0,0.10);}},
+  'Lunge': {cost:1, text:'+20 Gravegrit', play:G=>{G.turn.grit+=20;}},
+  'Guard': {cost:1, text:'+10 Gravegrit & +1 reroll', play:G=>{G.turn.grit+=10; G.turn.rerolls++;}},
+  'Hex Canticle': {cost:1, text:'Tag HEX (synergy with ☠️)', play:G=>{G.turn.tags.add('HEX_TAG');}},
+  'Focus': {cost:1, text:'+0.3 Oathfire', play:G=>{G.turn.oath+=0.3;}},
+  'Convert': {cost:1, text:'Turn one 🛡️ to ⚔️ this hand', play:G=>{const d=G.dice.find(d=>d.current && d.current.k==='SHIELD'); if(d){ d.current=FACE.SWORD; L('A shield becomes a blade.'); }}},
+  'Oathbound Strike': {cost:1, text:'+20 Gravegrit; double Fury from dice (this hand)', play:G=>{G.turn.grit+=20; G.turn.doubleFury=true;}},
+
+  // 2-cost heavies
+  'Bone Storm': {cost:2, text:'+40 Gravegrit, draw 2', play:G=>{G.turn.grit+=40; G.turn.drawNext+=2;}},
+  'Oathforge': {cost:2, text:'+1.0 Oathfire', play:G=>{G.turn.oath+=1.0;}},
+  'Hex Ritual': {cost:2, text:'Add HEX tag and +20 Gravegrit', play:G=>{G.turn.tags.add('HEX_TAG'); G.turn.grit+=20;}},
+
+  // 3-cost finishers
+  'Blood Oath': {cost:3, text:'+1.5 Oathfire and +40 Gravegrit', play:G=>{G.turn.oath+=1.5; G.turn.grit+=40;}},
+  'Dirge of the Pit': {cost:3, text:'Set Oathfire to at least 2.0 and +30 Gravegrit', play:G=>{G.turn.oath=Math.max(G.turn.oath,2.0); G.turn.grit+=30;}},
+
+  // Rarity synergies
+  'Rarity Tithe': {cost:2, text:'+8/+16/+24 Grit for 1/2/3+ Rare+ dice', play:G=>{
+    const rarePlus = G.dice.filter(d=>['rare','mythic'].includes(d.affix)).length;
+    G.turn.grit += rarePlus>=3?24: rarePlus==2?16: rarePlus==1?8: 0;
+  }},
+  'Mythic Vow': {cost:2, text:'+0.5 Oathfire (+1.0 if you own a Mythic)', play:G=>{
+    const hasM = G.dice.some(d=>d.affix==='mythic');
+    G.turn.oath += hasM?1.0:0.5;
+  }},
+  'Echo Chorus': {cost:1, text:'+0.3 Oathfire per Echo die (min +0.3)', play:G=>{
+    const echo = G.dice.filter(d=>d.echo).length;
+    G.turn.oath += Math.max(0.3, echo*0.3);
+  }},
+  'Gilded Tribute': {cost:2, text:'+4 Grit per Rare, +8 per Mythic, +2🦷 per Rare+', play:G=>{
+    let add=0; let teeth=0;
+    G.dice.forEach(d=>{ if(d.affix==='rare'){ add+=4; teeth+=2; } else if(d.affix==='mythic'){ add+=8; teeth+=2; } });
+    G.turn.grit += add; addTeeth(teeth);
+  }},
+  'Initiate Rally': {cost:1, text:'+6 Grit per Common die', play:G=>{
+    const c = G.dice.filter(d=>d.affix==='common').length; G.turn.grit += 6*c;
+  }},
+};
+
+function starterDeck(){ return ['Lunge','Lunge','Lunge','Guard','Guard','Hex Canticle','Focus','Convert','Bone Toss','Mire Shield']; }
+
+// ===== Beasts =====
+const BEASTS=[
+  {name:'Scout Beast', omen:'None', hp:(c)=> 40 + (c-1)*20},
+  {name:'Mire Beast', omen:'Thick Hide (+10% DR)', hp:(c)=> 65 + (c-1)*30, rule:(G)=>{G.enemy.dr=0.10;}},
+  {name:'Crypt Lord', omen:'Dread Sigil (+Hex burden per resolve)', hp:(c)=> 90 + (c-1)*45, rule:(G)=>{G.enemy.onResolveHex=1;}},
+];
+
+// ===== Shop / economy =====
+const SHOP={cardPackCost:12,singleCardCost:6,diceBagCost:20,perCaveDiceBagLimit:1, echoChance:0.18};
+const TEETH_REWARD = [8,12,20];
+const SELL_VALUE = {common:4,uncommon:6,rare:10,mythic:16, echoBonus:4};
+
+// ===== Game State =====
+const G={
+  cave:1, beastIndex:0,
+  handsMax:4, hands:4,
+  teeth:0,
+  energy:3, baseEnergy:3,
+  dice:[], hand:[], draw:[], discard:[],
+  enemy:{name:'', hp:0, hpMax:0, dr:0, onResolveHex:0},
+  turn:{grit:0, oath:0, rerolls:1, tags:new Set(), drawNext:0, doubleFury:false, lowerDR:0, shuffled:false},
+  caveDiceBagsBought:0
+};
+
+// ===== Modal Manager =====
+function hideAllModals(){ ['shop','preview','sell','manage'].forEach(id=>$(id).style.display='none'); }
+function showModal(id){ hideAllModals(); $(id).style.display='flex'; }
+
+// ===== Render helpers =====
+function labelRarity(r){ return r.charAt(0).toUpperCase()+r.slice(1); }
+
+function diceMini(d){
+  const wrap=document.createElement('div');
+  wrap.className='mini';
+  wrap.innerHTML=`
+    <svg viewBox="0 0 64 64" width="100%" height="100%">
+      <rect x="2" y="2" width="60" height="60" rx="8" fill="#101015" stroke="${d.affix==='mythic'?'#ffd46f': d.affix==='rare'?'#99baff': d.affix==='uncommon'?'#8fd2a7':'#6b6b6b'}" stroke-width="2"/>
+      <path d="M8,44 C22,38 28,26 38,24 46,22 54,28 58,32" stroke="${d.echo?'#c9bb86':'#2c2c32'}" stroke-width="2" fill="none"/>
+      ${d.echo?'<text x="10" y="18" font-size="10" fill="#e9dcac" font-weight="900">ECHO</text>':''}
+    </svg>`;
+  return wrap;
+}
+
+function renderDice(){
+  $('diceTray').innerHTML='';
+  G.dice.forEach((d, idx)=>{
+    const card=document.createElement('div'); card.className='dieCard';
+    const row=document.createElement('div'); row.className='dieRow';
+    row.appendChild(diceMini(d));
+    const meta=document.createElement('div'); meta.className='dieMeta';
+    meta.innerHTML = `<div><b>${d.name}</b> ${d.echo?'<span class="badge">ECHO</span>':''}</div>
+      <div><span class="rar ${d.affix}">${labelRarity(d.affix)}</span> • eff ${d.effect.type}</div>
+      <div>Current: <b>${d.current?d.current.i:'—'}</b></div>`;
+    row.appendChild(meta);
+    card.appendChild(row);
+    $('diceTray').appendChild(card);
+  });
+}
+
+function renderHand(){
+  $('hand').innerHTML='';
+  if(!G.hand.length){ const tip=document.createElement('div'); tip.className='pill'; tip.textContent='(No cards in hand)'; $('hand').appendChild(tip); return; }
+  G.hand.forEach((name,i)=>{
+    const def=CARD_DB[name];
+    const btn=document.createElement('button'); btn.className='card';
+    btn.innerHTML=`<div class="cost">${def.cost}</div><div class="name">${name}</div><div class="desc">${def.text}</div>`;
+    btn.disabled=(G.energy<def.cost);
+    btn.addEventListener('click',()=> playCard(i));
+    $('hand').appendChild(btn);
+  });
+}
+
+function updateUI(){
+  $('cave').textContent=G.cave; $('beast').textContent=(G.beastIndex+1)+'/3';
+  $('hands').textContent=G.hands; $('teeth').textContent=G.teeth; $('energy').textContent=G.energy;
+  $('rerolls').textContent=G.turn.rerolls; $('grit').textContent=Math.round(G.turn.grit); $('oath').textContent=G.turn.oath.toFixed(2);
+  $('enemyName').textContent=G.enemy.name; $('enemyHP').textContent=G.enemy.hp; $('enemyHPMax').textContent=G.enemy.hpMax;
+  $('enemyHPFill').style.width=(G.enemy.hp/G.enemy.hpMax*100)+'%';
+  $('drawCount').textContent=G.draw.length;
+  $('teethShop').textContent=G.teeth; $('shopTeeth').textContent=G.teeth;
+}
+
+// ===== Game Flow =====
+function pickByRarity(allowed){
+  return pick(DICE_BASE.filter(d=>allowed.includes(d.affix)));
+}
+
+function newRun(){
+  G.cave=1; G.beastIndex=0; G.handsMax=4; G.hands=4; G.teeth=0; G.caveDiceBagsBought=0;
+  G.energy=G.baseEnergy=3;
+  // 3 seed dice
+  G.dice=[ clone(pickByRarity(['common','uncommon'])), clone(pickByRarity(['common'])), clone(pickByRarity(['uncommon'])) ];
+  G.draw=shuffle(starterDeck()); G.discard=[]; G.hand=[];
+  startBeast();
+  L('— New run. The cave yawns open. —');
+}
+
+function startBeast(){
+  G.hands=G.handsMax;
+  const idx = G.beastIndex%3;
+  const b = BEASTS[idx];
+  const hp = b.hp(G.cave);
+  G.enemy={name:b.name, hp:hp, hpMax:hp, dr:0, onResolveHex:0};
+  if(b.rule) b.rule(G);
+  G.turn={grit:0,oath:0,rerolls:1,tags:new Set(), drawNext:0, doubleFury:false, lowerDR:0, shuffled:false};
+  updateUI(); renderDice();
+  // initial draw = 5
+  drawToHand(5);
+  L(`— ${b.name} (Cave ${G.cave}) — ${b.omen}`);
+}
+
+function drawToHand(target){
+  while(G.hand.length<target){
+    if(G.draw.length===0){ G.draw=shuffle(G.discard); G.discard=[]; }
+    if(G.draw.length===0) break;
+    G.hand.push(G.draw.pop());
+  }
+  updateUI(); renderHand();
+}
+
+// ===== Teeth pop =====
+function teethPop(amount){
+  const el=document.createElement('div');
+  el.className='teethPop';
+  el.style.color = amount>=0 ? '#8fff8f' : '#ff9f9f';
+  el.textContent = (amount>=0?'+':'')+amount+' 🦷';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),800);
+}
+function addTeeth(n){
+  G.teeth += n; teethPop(n); updateUI(); $('teethShop').textContent=G.teeth; $('shopTeeth').textContent=G.teeth;
+}
+
+// ===== Cards & dice actions =====
+function playCard(i){
+  const name=G.hand[i]; const def=CARD_DB[name];
+  if(G.energy<def.cost) return;
+  G.energy-=def.cost;
+  def.play(G);
+  const [c]=G.hand.splice(i,1);
+  G.discard.push(c);
+  if(G.turn.drawNext>0){ drawToHand(Math.min(5, G.hand.length + G.turn.drawNext)); G.turn.drawNext=0; }
+  updateUI(); renderHand();
+}
+
+function shuffleHand(){
+  if(G.turn.shuffled) { L('You already shuffled this hand.'); return; }
+  G.turn.shuffled=true;
+  while(G.hand.length){ G.draw.push(G.hand.pop()); }
+  G.draw=shuffle(G.draw);
+  drawToHand(5);
+  L('You reshuffle your options.');
+}
+
+function rollDice(){
+  if(G.turn.rerolls<=0){ L('No rerolls left.'); return; }
+  let turnFuryBonus=0, turnGritBonus=0;
+  G.dice.forEach(d=>{
+    const idx=R(d.faces.length); d.current=d.faces[idx];
+    if(d.effect?.type==='fury_per_eye' && d.current.k==='EYE'){ turnFuryBonus += d.effect.v; }
+    if(d.effect?.type==='fury_per_wild' && d.current.k==='WILD'){ turnFuryBonus += d.effect.v; }
+    if(d.effect?.type==='flat_fury'){ turnFuryBonus += d.effect.v; }
+    if(d.effect?.type==='fury_per_sword' && d.current.k==='SWORD'){ turnFuryBonus += d.effect.v; }
+    if(d.effect?.type==='flat_grit'){ turnGritBonus += d.effect.v; }
+    if(d.effect?.type==='grit_on_hex' && (d.current.k==='HEX' || G.turn.tags.has('HEX_TAG')) ){ turnGritBonus += d.effect.v; }
+    if(d.effect?.type==='reduce_maxhp_on_hex' && d.current.k==='HEX'){ G.enemy.hpMax = Math.max(1, G.enemy.hpMax - d.effect.v); G.enemy.hp = Math.min(G.enemy.hp, G.enemy.hpMax); }
+    if(d.effect?.type==='sword_amp_but_hand_penalty' && d.current.k==='SWORD'){ turnGritBonus += Math.round( (G.turn.grit+turnGritBonus) * d.effect.v ); }
+  });
+  G.turn.oath += (G.turn.doubleFury? turnFuryBonus*2 : turnFuryBonus);
+  G.turn.grit += turnGritBonus;
+  G.turn.rerolls--;
+  $('btnResolve').disabled=false;
+  updateUI(); renderDice();
+  L(`You roll. +${Math.round(turnGritBonus)} Gravegrit, +${turnFuryBonus.toFixed(2)} Oathfire.`);
+}
+
+function resolveHand(){
+  const mult=1+G.turn.oath;
+  const dmgRaw = Math.round(G.turn.grit * mult);
+  const dr = clamp( (G.enemy.dr||0) - (G.turn.lowerDR||0), 0, 0.9 );
+  const dmg = Math.round(dmgRaw * (1-dr));
+  G.enemy.hp = clamp(G.enemy.hp - dmg, 0, G.enemy.hpMax);
+  L(`Resolve → Grit ${Math.round(G.turn.grit)} × (1+${G.turn.oath.toFixed(2)}) = ${dmgRaw} → after DR ${dmg}`);
+  if(G.enemy.onResolveHex){ L('Dread Sigil pulses. The air sours.'); G.turn.grit += 10; }
+  G.dice.forEach(d=>{ if(d.effect?.type==='teeth_on_resolve'){ addTeeth(d.effect.v); } });
+  endHand(true);
+  checkBeastEnd();
+}
+
+function endHand(){
+  G.hands=Math.max(0,G.hands-1);
+  G.energy=G.baseEnergy;
+  G.turn={grit:0,oath:0,rerolls:1,tags:new Set(), drawNext:0, doubleFury:false, lowerDR:0, shuffled:false};
+  drawToHand(5);
+  $('btnResolve').disabled=true;
+  updateUI();
+}
+
+// ===== Dice add/sell rules =====
+function sellDie(idx){
+  const d=G.dice[idx];
+  const val = (SELL_VALUE[d.affix]||4)+(d.echo?SELL_VALUE.echoBonus:0);
+  addTeeth(val);
+  G.dice.splice(idx,1);
+  renderDice(); updateUI();
+}
+
+function atCapAfterAdding(newDie){
+  const nonEchoCount = G.dice.filter(d=>!d.echo).length;
+  const addingEcho = !!newDie.echo;
+  if(addingEcho) return false;
+  return nonEchoCount>=4;
+}
+
+function showSellModal(confirmCb){
+  $('sellChoices').innerHTML='';
+  G.dice.forEach((d,idx)=>{
+    const c=document.createElement('div'); c.className='choice';
+    const row=document.createElement('div'); row.className='row';
+    const mini=diceMini(d);
+    const meta=document.createElement('div'); meta.innerHTML=`<b>${d.name}</b> ${d.echo?'<span class="badge">ECHO</span>':''}
+      <div><span class="rar ${d.affix}">${labelRarity(d.affix)}</span> • eff ${d.effect.type}</div>
+      <div>Sell for <b>${(SELL_VALUE[d.affix]||4)+(d.echo?SELL_VALUE.echoBonus:0)}🦷</b></div>`;
+    const btn=document.createElement('button'); btn.className='btn danger'; btn.textContent='Sell';
+    btn.addEventListener('click',()=>{ sellDie(idx); hideAllModals(); if(confirmCb) confirmCb(); });
+    row.appendChild(mini); row.appendChild(meta); row.appendChild(btn);
+    c.appendChild(row); $('sellChoices').appendChild(c);
+  });
+  $('btnSellCancel').onclick=()=>{ hideAllModals(); };
+  showModal('sell');
+}
+
+// ===== Shop =====
+function diceWithMaybeEcho(base){
+  const d=clone(base);
+  d.echo = Math.random() < SHOP.echoChance;
+  return d;
+}
+function sampleDice(n){
+  const weight = d=> d.affix==='common'?40 : d.affix==='uncommon'?30 : d.affix==='rare'?20 : d.affix==='mythic'?8 : 10;
+  const bag=[]; DICE_BASE.forEach(d=>{ for(let i=0;i<weight(d);i++) bag.push(d); });
+  const out=[]; while(out.length<n){ const cand = diceWithMaybeEcho(bag[R(bag.length)]); if(!out.some(x=>x.name===cand.name && x.echo===cand.echo)) out.push(cand); }
+  return out;
+}
+function sampleCards(n){
+  const names=Object.keys(CARD_DB); const out=[]; while(out.length<n){ const cand = pick(names); if(!out.includes(cand)) out.push(cand); } return out;
+}
+
+function showShop(){
+  $('shopChoices').innerHTML='';
+  $('teethShop').textContent=G.teeth; $('shopTeeth').textContent=G.teeth; $('shopTeethHint').style.display='inline-block';
+
+  const diceChoices=sampleDice(3);
+  const singleChoices=sampleCards(3);
+  const packChoices=sampleCards(3);
+
+  // Dice Bag
+  const diceDiv=document.createElement('div'); diceDiv.className='choice';
+  diceDiv.innerHTML=`<div class="row sp"><div><b>Dice Bag</b><div class="muted">Pick 1 of 3 random dice</div></div><div class="price">${SHOP.diceBagCost} 🦷</div></div>`;
+  const row=document.createElement('div'); row.className='row';
+  diceChoices.forEach(d=>{
+    const btn=document.createElement('button'); btn.className='btn';
+    const wrap=document.createElement('div'); wrap.className='row';
+    const mini=diceMini(d);
+    const txt=document.createElement('div'); txt.innerHTML=`${d.name} ${d.echo?'<span class="badge">ECHO</span>':''} <span class="rar ${d.affix}">${labelRarity(d.affix)}</span>`;
+    wrap.appendChild(mini); wrap.appendChild(txt);
+    btn.appendChild(wrap);
+    btn.addEventListener('click',()=>{
+      if(G.teeth<SHOP.diceBagCost){ alert('Not enough Teeth'); return; }
+      const add = ()=>{ addTeeth(-SHOP.diceBagCost); G.dice.push(d); renderDice(); updateUI(); L(`Took ${d.name}${d.echo?' (Echo)':''}.`); };
+      if(atCapAfterAdding(d)){ showSellModal(add); } else { add(); }
+    });
+    row.appendChild(btn);
+  });
+  diceDiv.appendChild(row); $('shopChoices').appendChild(diceDiv);
+
+  // Single Card
+  const singleDiv=document.createElement('div'); singleDiv.className='choice';
+  singleDiv.innerHTML=`<div class="row sp"><div><b>Choose a Card</b><div class="muted">Pick 1 of 3</div></div><div class="price">${SHOP.singleCardCost} 🦷</div></div>`;
+  const srow=document.createElement('div'); srow.className='row';
+  singleChoices.forEach(n=>{
+    const b=document.createElement('button'); b.className='btn'; b.textContent=n;
+    b.addEventListener('click',()=>{
+      if(G.teeth<SHOP.singleCardCost){ alert('Not enough Teeth'); return; }
+      addTeeth(-SHOP.singleCardCost); G.discard.push(n); updateUI(); L(`Added ${n} to your deck.`);
+    });
+    srow.appendChild(b);
+  });
+  singleDiv.appendChild(srow); $('shopChoices').appendChild(singleDiv);
+
+  // Card Pack (get all 3)
+  const packDiv=document.createElement('div'); packDiv.className='choice';
+  packDiv.innerHTML=`<div class="row sp"><div><b>Card Pack</b><div class="muted">Gain all 3</div></div><div class="price">${SHOP.cardPackCost} 🦷</div></div>`;
+  const prow=document.createElement('div'); prow.className='row';
+  packChoices.forEach(n=>{ const tag=document.createElement('span'); tag.className='pill'; tag.textContent=n; prow.appendChild(tag); });
+  const buy=document.createElement('button'); buy.className='btn'; buy.textContent='Buy Pack';
+  buy.addEventListener('click',()=>{
+    if(G.teeth<SHOP.cardPackCost){ alert('Not enough Teeth'); return; }
+    addTeeth(-SHOP.cardPackCost); packChoices.forEach(n=>G.discard.push(n)); updateUI(); L(`Packed ${packChoices.join(', ')} into your deck.`);
+  });
+  packDiv.appendChild(prow); packDiv.appendChild(buy); $('shopChoices').appendChild(packDiv);
+
+  showModal('shop');
+}
+
+function hideShop(){ hideAllModals(); $('shopTeethHint').style.display='none'; }
+
+function showPreview(){
+  $('previewBody').innerHTML='';
+  const dSec=document.createElement('div'); dSec.className='choice'; dSec.innerHTML='<b>Dice</b>';
+  G.dice.forEach(d=>{ const p=document.createElement('div'); p.className='row'; p.appendChild(diceMini(d)); const t=document.createElement('div'); t.innerHTML=`${d.name} ${d.echo?'<span class="badge">ECHO</span>':''} <span class="rar ${d.affix}">${labelRarity(d.affix)}</span>`; p.appendChild(t); dSec.appendChild(p); });
+  const cSec=document.createElement('div'); cSec.className='choice';
+  cSec.innerHTML=`<b>Deck</b> <span class="pill">${G.draw.length + G.hand.length + G.discard.length} cards</span>`;
+  const sample=(G.draw.concat(G.hand,G.discard)).slice(0,12);
+  const list=document.createElement('div'); list.className='row'; sample.forEach(n=>{ const tag=document.createElement('span'); tag.className='pill'; tag.textContent=n; list.appendChild(tag); });
+  cSec.appendChild(list);
+  const tSec=document.createElement('div'); tSec.className='choice'; tSec.innerHTML=`<b>Teeth</b> <span class="pill">🦷 ${G.teeth}</span>`;
+  $('previewBody').appendChild(dSec); $('previewBody').appendChild(cSec); $('previewBody').appendChild(tSec);
+  showModal('preview');
+}
+
+// ===== Progression =====
+function grantTeethForVictory(){
+  const reward = TEETH_REWARD[G.beastIndex%3] || 10;
+  addTeeth(reward);
+  L(`You wrench ${reward} Teeth from the fallen ${G.enemy.name}.`);
+}
+function checkBeastEnd(){
+  if(G.enemy.hp<=0){
+    L(`— ${G.enemy.name} felled. —`);
+    grantTeethForVictory();
+    if(G.beastIndex%3<2){ showShop(); }
+    else { G.beastIndex= -1; G.cave++; G.caveDiceBagsBought=0; } // will ++ to 0 next line
+    G.beastIndex++; // advance index
+  } else if(G.hands<=0){
+    alert('Out of hands! The beast endures. You regroup.');
+    startBeast();
+  }
+}
+
+// ===== Manage Dice =====
+function openManage(){
+  $('manageChoices').innerHTML='';
+  G.dice.forEach((d,idx)=>{
+    const c=document.createElement('div'); c.className='choice';
+    const row=document.createElement('div'); row.className='row';
+    const mini=diceMini(d);
+    const val=(SELL_VALUE[d.affix]||4)+(d.echo?SELL_VALUE.echoBonus:0);
+    const meta=document.createElement('div'); meta.innerHTML=`<b>${d.name}</b> ${d.echo?'<span class="badge">ECHO</span>':''}
+      <div><span class="rar ${d.affix}">${labelRarity(d.affix)}</span> • eff ${d.effect.type}</div>
+      <div>Sell for <b>${val}🦷</b></div>`;
+    const btn=document.createElement('button'); btn.className='btn danger'; btn.textContent='Sell';
+    btn.addEventListener('click',()=>{ sellDie(idx); openManage(); });
+    row.appendChild(mini); row.appendChild(meta); row.appendChild(btn);
+    c.appendChild(row); $('manageChoices').appendChild(c);
+  });
+  showModal('manage');
+}
+
+// ===== Wire buttons =====
+$('btnNew').addEventListener('click', newRun);
+$('btnRoll').addEventListener('click', rollDice);
+$('btnResolve').addEventListener('click', resolveHand);
+$('btnEndHand').addEventListener('click', endHand);
+$('btnShuffle').addEventListener('click', shuffleHand);
+$('btnManage').addEventListener('click', openManage);
+$('btnManageClose').addEventListener('click', ()=> hideAllModals());
+$('btnSkipShop').addEventListener('click', ()=>{ hideShop(); showPreview(); });
+$('btnPreviewContinue').addEventListener('click', ()=>{ hideAllModals(); startBeast(); });
+$('btnSellCancel').addEventListener('click', ()=>{ hideAllModals(); });
+
+// ===== Boot =====
+newRun();
+</script>
+</body>
+</html>
