@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>BocheCrawler v0.8.2 — Single‑File Playable</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<style>
+:root{
+  --bg:#0a0a0c; --panel:#121216; --ink:#eee8de; --muted:#aaa59a; --line:#24242b;
+  --r-common:#8a8a8f; --r-uncommon:#8fd2a7; --r-rare:#99baff; --r-mythic:#ffd46f; --r-echo:#e9dcac;
+}
+*{box-sizing:border-box} html,body{height:100%}
+body{margin:0;background:radial-gradient(1400px 900px at 50% -200px,#15151a,#0a0a0c);color:var(--ink);
+  font-family: ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;}
+#wrap{width:100%;max-width:1100px;height:100svh;margin:0 auto;display:flex;flex-direction:column}
+.top{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;background:#0e0e12;border-bottom:1px solid var(--line)}
+.title{font-weight:900;letter-spacing:.2px;font-size:14px}
+.hud{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{padding:4px 8px;border:1px solid #333;border-radius:999px;font-size:12px;color:var(--muted);background:#141418}
+.btn{background:#18181f;color:var(--ink);border:1px solid #2c2c34;padding:8px 12px;border-radius:12px;font-weight:800;font-size:12px;cursor:pointer}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn.small{padding:6px 8px;font-size:11px;border-radius:10px}
+.ghost{background:transparent}
+.row{display:flex;gap:8px;align-items:center}
+.arena{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr auto auto;gap:10px;padding:10px 12px;flex:1;overflow:auto}
+.field{grid-column:1/span 2;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.side{background:#0f0f13;border:1px solid var(--line);border-radius:16px;padding:10px;display:grid;grid-template-rows:auto 1fr auto;gap:6px}
+.sprite{height:180px;border-radius:14px;background:linear-gradient(180deg,#1a1a1f,#101015);border:1px solid #2a2a33;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.lab{position:absolute;top:6px;left:6px;font-size:11px;color:#cfc7b7;background:#141418;border:1px solid var(--line);padding:2px 6px;border-radius:8px}
+.hp{position:relative;height:14px;background:#16161b;border:1px solid #2a2a33;border-radius:999px;overflow:hidden}
+.hp>i{position:absolute;inset:0;width:100%;background:linear-gradient(90deg,#e87070,#b14040)}
+.tray{grid-column:1/span 2;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:8px 6px;background:#101015;border-radius:14px}
+.die{background:#141419;border:1px solid #2a2a33;border-radius:14px;padding:10px}
+.drow{display:grid;grid-template-columns:64px 1fr;gap:10px;align-items:center}
+.meta{font-size:12px;color:var(--muted)}
+.r{font-weight:900;text-transform:capitalize}
+.r.common{color:var(--r-common)} .r.uncommon{color:var(--r-uncommon)} .r.rare{color:var(--r-rare)} .r.mythic{color:var(--r-mythic)}
+.badge{display:inline-block;padding:1px 6px;border-radius:999px;border:1px solid var(--line);background:#17171a;font-size:10px;margin-left:6px}
+.hbar{grid-column:1/span 2;display:flex;justify-content:space-between;align-items:center}
+.hand{grid-column:1/span 2;display:flex;flex-wrap:wrap;gap:8px;min-height:120px}
+.card{width:148px;background:#15151a;border:1px solid #2a2a33;border-radius:14px;padding:8px;text-align:left;position:relative}
+.card .cost{position:absolute;top:6px;right:6px;font-weight:900;font-size:12px;padding:2px 6px;border-radius:8px;border:1px solid var(--line);background:#1b1b20}
+.card .name{font-weight:800;font-size:13px;margin-bottom:2px}
+.card .desc{font-size:11px;color:var(--muted);min-height:34px}
+.log{grid-column:1/span 2;max-height:160px;overflow:auto;font-size:12px;line-height:1.35;color:var(--muted);border-top:1px dashed #2a2a33;padding-top:6px}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;padding:16px;z-index:100}
+.modal{background:#131318;border:1px solid #2a2a33;border-radius:16px;width:100%;max-width:580px;padding:12px}
+.choices{display:grid;grid-template-columns:1fr;gap:8px}
+.choice{background:#15151b;border:1px solid #2a2a33;border-radius:12px;padding:10px;text-align:left}
+.choice .row{align-items:flex-start}
+.mini{width:54px;height:54px;border-radius:8px;border:1px solid #2a2a33;overflow:hidden}
+.teethPop{position:absolute;transform:translate(-50%,-50%);left:50%;top:50%;font-weight:900;text-shadow:0 2px 8px rgba(0,0,0,.6);pointer-events:none;animation:teethFloat .8s ease forwards}
+@keyframes teethFloat{0%{opacity:0;transform:translate(-50%,-30%) scale(.9)}20%{opacity:1}100%{opacity:0;transform:translate(-50%,-90%) scale(1.08)}}
+@media(max-width:860px){.arena{grid-template-columns:1fr;grid-template-rows:auto auto 1fr auto auto}.field{grid-column:1;grid-template-columns:1fr}.hand{justify-content:center}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="top">
+    <div class="title">BocheCrawler v0.8.2 — Single‑File Playable</div>
+    <div class="hud">
+      <span class="pill">Cave <b id="cave">1</b></span>
+      <span class="pill">Beast <b id="beast">1/3</b></span>
+      <span class="pill">Teeth 🦷 <b id="teeth">0</b></span>
+      <span class="pill">Hands <b id="hands">4</b></span>
+      <span class="pill">Energy <b id="energy">3</b></span>
+    </div>
+    <div class="row">
+      <button class="btn small" id="btnManage">Manage Dice</button>
+      <button class="btn small" id="btnNew">New Run</button>
+    </div>
+  </div>
+
+  <div class="arena">
+    <div class="field">
+      <div class="side">
+        <div class="sprite">
+          <span class="lab" id="enemyName">Scout Beast</span>
+          <!-- simple inline beast art -->
+          <svg viewBox="0 0 240 180" width="100%" height="100%">
+            <rect width="240" height="180" fill="#121218"/>
+            <path d="M20,150 Q80,120 110,140 T220,145 L220,180 L20,180 Z" fill="#0d0d11"/>
+            <path d="M80,145 C110,120 130,80 160,86 190,92 210,132 218,145 L196,145 C182,125 170,110 156,112 140,115 132,130 118,145 Z" fill="#1a1a22"/>
+            <circle cx="160" cy="107" r="7" fill="#b34a4a"/><circle cx="143" cy="106" r="5" fill="#cfc7b7"/>
+          </svg>
+        </div>
+        <div class="hp"><i id="ehpF"></i></div>
+        <div class="row" style="justify-content:space-between">
+          <span class="pill">Omen: <b id="omen">—</b></span>
+          <span class="pill">HP <b id="ehp">50</b>/<b id="ehpM">50</b></span>
+        </div>
+      </div>
+
+      <div class="side">
+        <div class="sprite">
+          <span class="lab">Crawler</span>
+          <svg viewBox="0 0 240 180" width="100%" height="100%">
+            <rect width="240" height="180" fill="#101015"/>
+            <path d="M15,155 L225,155" stroke="#1f1f26" stroke-width="8"/>
+            <path d="M95,150 C105,110 118,80 134,80 C150,80 164,112 170,150 Z" fill="#1a1a22"/>
+            <rect x="120" y="70" width="26" height="12" fill="#23232b" transform="rotate(-15 133 76)"/>
+            <rect x="152" y="96" width="28" height="16" fill="#23232b" transform="rotate(15 166 104)"/>
+            <circle cx="138" cy="92" r="5" fill="#cfc7b7"/>
+          </svg>
+        </div>
+        <div class="row" style="justify-content:space-between">
+          <span class="pill">Gravegrit: <b id="grit">0</b></span>
+          <span class="pill">Oathfire: <b id="oath">0</b>x</span>
+        </div>
+        <div class="row">
+          <button class="btn" id="btnRoll">Roll</button>
+          <button class="btn" id="btnResolve" disabled>Resolve</button>
+          <button class="btn" id="btnEnd" disabled>End Hand</button>
+          <button class="btn ghost" id="btnShuffle">Shuffle Hand (1)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tray" id="tray"></div>
+
+    <div class="hbar">
+      <div class="row"><span class="pill">Draw <b id="draw">0</b></span><span class="pill">Rerolls <b id="rer">1</b></span></div>
+      <div class="row"><span class="pill" id="teethHint" style="display:none">🦷 <b id="teethShop">0</b></span></div>
+    </div>
+    <div class="hand" id="hand"></div>
+
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<!-- Shop -->
+<div class="overlay" id="shop">
+  <div class="modal">
+    <div class="row" style="justify-content:space-between">
+      <h3 style="margin:0">Burrow‑Market</h3>
+      <span class="pill">🦷 <b id="teethShop2">0</b></span>
+    </div>
+    <div class="choices" id="shopChoices"></div>
+    <div class="row" style="margin-top:8px"><button class="btn" id="shopLeave">Leave</button></div>
+  </div>
+</div>
+
+<!-- Preview -->
+<div class="overlay" id="preview">
+  <div class="modal">
+    <div class="row" style="justify-content:space-between">
+      <h3 style="margin:0 0 6px 0">Loadout Preview</h3>
+      <button class="btn small" id="previewContinue">Continue</button>
+    </div>
+    <div class="choices" id="previewBody"></div>
+  </div>
+</div>
+
+<!-- Manage Dice -->
+<div class="overlay" id="manage">
+  <div class="modal">
+    <div class="row" style="justify-content:space-between">
+      <h3 style="margin:0">Manage Dice</h3>
+      <button class="btn small" id="manageClose">Close</button>
+    </div>
+    <div class="choices" id="manageChoices"></div>
+  </div>
+</div>
+
+<!-- Sell -->
+<div class="overlay" id="sell">
+  <div class="modal">
+    <div class="row" style="justify-content:space-between">
+      <h3 style="margin:0">Sell a Die</h3>
+      <button class="btn small" id="sellClose">Close</button>
+    </div>
+    <div class="choices" id="sellChoices"></div>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id), L=t=>{const p=document.createElement('p');p.textContent=t;$('log').prepend(p)},R=n=>Math.floor(Math.random()*n),pick=a=>a[R(a.length)],clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function clone(x){return JSON.parse(JSON.stringify(x))}
+
+const FACE={SWORD:{k:'SWORD',i:'⚔️'},SHIELD:{k:'SHIELD',i:'🛡️'},EYE:{k:'EYE',i:'👁️'},HEX:{k:'HEX',i:'☠️'},WILD:{k:'WILD',i:'⭐'}};
+const RAR={COMMON:'common',UNCOMMON:'uncommon',RARE:'rare',MYTHIC:'mythic'};
+
+const DICE=[
+ {name:'Initiate Die',faces:[FACE.SWORD,FACE.SWORD,FACE.SHIELD,FACE.EYE,FACE.WILD,FACE.SHIELD],affix:RAR.COMMON,effect:{type:'fury_eye',v:.25}},
+ {name:'Stitched Cube',faces:[FACE.SWORD,FACE.SHIELD,FACE.SHIELD,FACE.EYE,FACE.SWORD,FACE.SHIELD],affix:RAR.COMMON,effect:{type:'flat_grit',v:6}},
+ {name:'Omen-Carved',faces:[FACE.SWORD,FACE.SWORD,FACE.HEX,FACE.SWORD,FACE.EYE,FACE.HEX],affix:RAR.UNCOMMON,effect:{type:'grit_hex',v:8}},
+ {name:'Blessed Cube',faces:[FACE.SWORD,FACE.WILD,FACE.SHIELD,FACE.EYE,FACE.SWORD,FACE.SHIELD],affix:RAR.UNCOMMON,effect:{type:'flat_fury',v:.2}},
+ {name:'Rot Die',faces:[FACE.HEX,FACE.SWORD,FACE.HEX,FACE.SHIELD,FACE.EYE,FACE.HEX],affix:RAR.UNCOMMON,effect:{type:'maxhp_hex',v:5}},
+ {name:'Bone Fracture',faces:[FACE.SWORD,FACE.SWORD,FACE.SWORD,FACE.EYE,FACE.WILD,FACE.SHIELD],affix:RAR.RARE,effect:{type:'fury_sword',v:.4}},
+ {name:'Gilded Jaw',faces:[FACE.SWORD,FACE.EYE,FACE.SHIELD,FACE.SWORD,FACE.WILD,FACE.SHIELD],affix:RAR.RARE,effect:{type:'teeth_on_resolve',v:2}},
+ {name:'Hollow Face',faces:[FACE.WILD,FACE.SWORD,FACE.WILD,FACE.SWORD,FACE.WILD,FACE.SWORD],affix:RAR.MYTHIC,effect:{type:'sword_amp_hand_penalty',v:.5}},
+];
+
+const CARD_DB={
+ 'Lunge':{c:1,t:'+20 Gravegrit',p:G=>G.turn.grit+=20},
+ 'Guard':{c:1,t:'+10 Grit & +1 reroll',p:G=>{G.turn.grit+=10;G.turn.rerolls++}},
+ 'Bone Toss':{c:1,t:'+10 Grit, draw 1',p:G=>{G.turn.grit+=10;G.turn.drawNext++}},
+ 'Mire Shield':{c:1,t:'+15 Grit & -10% enemy DR (hand)',p:G=>{G.turn.grit+=15;G.turn.lowerDR=Math.max(G.turn.lowerDR||0,.10)}},
+ 'Hex Canticle':{c:1,t:'Tag HEX (☠️ synergy)',p:G=>G.turn.tags.add('HEX_TAG')},
+ 'Focus':{c:1,t:'+0.3 Oathfire',p:G=>G.turn.oath+=.3},
+ 'Convert':{c:1,t:'Turn one 🛡️ to ⚔️ this hand',p:G=>{const d=G.dice.find(d=>d.current&&d.current.k==='SHIELD');if(d){d.current=FACE.SWORD;L('A shield becomes a blade.')}}},
+ 'Oathbound Strike':{c:1,t:'+20 Grit; double Fury this hand',p:G=>{G.turn.grit+=20;G.turn.doubleFury=true}},
+ 'Bone Storm':{c:2,t:'+40 Grit, draw 2',p:G=>{G.turn.grit+=40;G.turn.drawNext+=2}},
+ 'Oathforge':{c:2,t:'+1.0 Oathfire',p:G=>G.turn.oath+=1.0},
+ 'Hex Ritual':{c:2,t:'Add HEX tag +20 Grit',p:G=>{G.turn.tags.add('HEX_TAG');G.turn.grit+=20}},
+ 'Blood Oath':{c:3,t:'+1.5 Oathfire +40 Grit',p:G=>{G.turn.oath+=1.5;G.turn.grit+=40}},
+ 'Dirge of the Pit':{c:3,t:'Set Oathfire min 2.0 +30 Grit',p:G=>{G.turn.oath=Math.max(G.turn.oath,2.0);G.turn.grit+=30}},
+ 'Rarity Tithe':{c:2,t:'+8/+16/+24 Grit for 1/2/3+ Rare+',p:G=>{const k=G.dice.filter(d=>['rare','mythic'].includes(d.affix)).length;G.turn.grit+=k>=3?24:k==2?16:k==1?8:0}},
+ 'Mythic Vow':{c:2,t:'+0.5 Oath (+1.0 if Mythic owned)',p:G=>{G.turn.oath+=G.dice.some(d=>d.affix==='mythic')?1.0:.5}},
+ 'Echo Chorus':{c:1,t:'+0.3 Oath per Echo die (min +0.3)',p:G=>{const e=G.dice.filter(d=>d.echo).length;G.turn.oath+=Math.max(.3,e*.3)}},
+ 'Gilded Tribute':{c:2,t:'+4 Grit per Rare, +8 per Mythic, +2🦷 each',p:G=>{let add=0,t=0;G.dice.forEach(d=>{if(d.affix==='rare'){add+=4;t+=2}else if(d.affix==='mythic'){add+=8;t+=2}});G.turn.grit+=add;addTeeth(t)}},
+ 'Initiate Rally':{c:1,t:'+6 Grit per Common',p:G=>{G.turn.grit+=6*G.dice.filter(d=>d.affix==='common').length}},
+};
+function starter(){return ['Lunge','Lunge','Lunge','Guard','Guard','Hex Canticle','Focus','Convert','Bone Toss','Mire Shield']}
+
+const BEASTS=[
+ {name:'Scout Beast',omen:'—',hp:c=>40+(c-1)*20},
+ {name:'Mire Beast',omen:'Thick Hide (+10% DR)',hp:c=>65+(c-1)*30,rule:G=>G.enemy.dr=.10},
+ {name:'Crypt Lord',omen:'Dread Sigil (+Hex burden)',hp:c=>90+(c-1)*45,rule:G=>G.enemy.onResolveHex=1},
+];
+
+const SHOP={cardPackCost:12,singleCardCost:6,diceBagCost:20,echoChance:.18};
+const TEETH_REWARD=[8,12,20];
+const SELL={common:4,uncommon:6,rare:10,mythic:16,echo:4};
+
+const G={cave:1,beast:0,handsMax:4,hands:4,teeth:0,energy:3,baseE:3,
+ dice:[],hand:[],draw:[],discard:[],
+ enemy:{name:'',hp:0,hm:0,dr:0,onResolveHex:0},
+ turn:{grit:0,oath:0,rerolls:1,tags:new Set(),drawNext:0,doubleFury:false,lowerDR:0,shuffled:false}};
+
+function ui(){ $('cave').textContent=G.cave;$('beast').textContent=(G.beast+1)+'/3';$('hands').textContent=G.hands;$('teeth').textContent=G.teeth;$('energy').textContent=G.energy;$('grit').textContent=Math.round(G.turn.grit);$('oath').textContent=G.turn.oath.toFixed(2);$('ehp').textContent=G.enemy.hp;$('ehpM').textContent=G.enemy.hm;$('ehpF').style.width=(G.enemy.hp/G.enemy.hm*100)+'%';$('draw').textContent=G.draw.length;$('rer').textContent=G.turn.rerolls;$('teethShop').textContent=G.teeth;$('teethShop2').textContent=G.teeth}
+function mini(d){const c=document.createElement('div');c.className='mini';c.innerHTML=`<svg viewBox="0 0 64 64" width="100%" height="100%"><defs><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2"/><feColorMatrix type="saturate" values="0.1"/></filter></defs><rect x="2" y="2" width="60" height="60" rx="8" fill="#0f0f14" stroke="${d.affix==='mythic'?'#ffd46f':d.affix==='rare'?'#99baff':d.affix==='uncommon'?'#8fd2a7':'#8a8a8f'}" stroke-width="2"/><g filter="url(#n)" opacity="0.18"><rect x="2" y="2" width="60" height="60" fill="#fff"/></g><path d="M20 46 L32 18 L44 46 M26 34 L38 34" stroke="${d.echo?'#e9dcac':'#cfc7b7'}" stroke-width="2" fill="none"/>${d.echo?'<text x="6" y="16" font-size="9" fill="#e9dcac" font-weight="900">ECHO</text>':''}</svg>`;return c}
+function renderDice(){const t=$('tray');t.innerHTML='';G.dice.forEach(d=>{const card=document.createElement('div');card.className='die';const row=document.createElement('div');row.className='drow';row.appendChild(mini(d));const m=document.createElement('div');m.className='meta';m.innerHTML=`<div><b>${d.name}</b> ${d.echo?'<span class="badge">ECHO</span>':''}</div><div><span class="r ${d.affix}">${d.affix}</span> • eff ${d.effect.type}</div><div>Current: <b>${d.current?d.current.i:'—'}</b></div>`;row.appendChild(m);card.appendChild(row);t.appendChild(card)})}
+function renderHand(){const h=$('hand');h.innerHTML='';if(!G.hand.length){const tip=document.createElement('div');tip.className='pill';tip.textContent='(No cards)';h.appendChild(tip);return}G.hand.forEach((n,i)=>{const d=CARD_DB[n];const b=document.createElement('button');b.className='card';b.innerHTML=`<div class="cost">${d.c}</div><div class="name">${n}</div><div class="desc">${d.t}</div>`;b.disabled=G.energy<d.c;b.onclick=()=>play(i);h.appendChild(b)})}
+function drawTo(n){while(G.hand.length<n){if(!G.draw.length){G.draw=shuffle(G.discard);G.discard=[]}if(!G.draw.length)break;G.hand.push(G.draw.pop())}ui();renderHand()}
+
+function newRun(){G.cave=1;G.beast=0;G.hands=G.handsMax;G.teeth=0;G.energy=G.baseE=3;G.dice=[clone(pickBy(['common','uncommon'])),clone(pickBy(['common'])),clone(pickBy(['uncommon']))];G.draw=shuffle(starter());G.discard=[];G.hand=[];startBeast();L('— New run. The burrow stirs. —')}
+function pickBy(list){return pick(DICE.filter(d=>list.includes(d.affix)))}
+function startBeast(){G.hands=G.handsMax;const b=BEASTS[G.beast%3];const hp=b.hp(G.cave);G.enemy={name:b.name,hp:hp,hm:hp,dr:0,onResolveHex:0};if(b.rule)b.rule(G);$('enemyName').textContent=G.enemy.name;$('omen').textContent=b.omen;G.turn={grit:0,oath:0,rerolls:1,tags:new Set(),drawNext:0,doubleFury:false,lowerDR:0,shuffled:false};renderDice();drawTo(5);ui();L(`— ${b.name} (Cave ${G.cave}) — ${b.omen}`)}
+
+function roll(){if(G.turn.rerolls<=0){L('No rerolls left.');return}let fury=0,gr=0;G.dice.forEach(d=>{d.current=d.faces[R(d.faces.length)];if(d.effect.type==='fury_eye'&&d.current.k==='EYE')fury+=d.effect.v;if(d.effect.type==='flat_fury')fury+=d.effect.v;if(d.effect.type==='fury_sword'&&d.current.k==='SWORD')fury+=d.effect.v;if(d.effect.type==='flat_grit')gr+=d.effect.v;if(d.effect.type==='grit_hex'&&(d.current.k==='HEX'||G.turn.tags.has('HEX_TAG')))gr+=d.effect.v;if(d.effect.type==='maxhp_hex'&&d.current.k==='HEX'){G.enemy.hm=Math.max(1,G.enemy.hm-d.effect.v);G.enemy.hp=Math.min(G.enemy.hp,G.enemy.hm)}if(d.effect.type==='sword_amp_hand_penalty'&&d.current.k==='SWORD'){gr+=Math.round((G.turn.grit+gr)*d.effect.v)}});G.turn.oath+=G.turn.doubleFury?fury*2:fury;G.turn.grit+=gr;G.turn.rerolls--;$('btnResolve').disabled=false;renderDice();ui();L(`You roll. +${Math.round(gr)} Grit, +${fury.toFixed(2)} Oath.`)}
+function resolve(){const mult=1+G.turn.oath,raw=Math.round(G.turn.grit*mult),dr=clamp((G.enemy.dr||0)-(G.turn.lowerDR||0),0,.9),dmg=Math.round(raw*(1-dr));G.enemy.hp=clamp(G.enemy.hp-dmg,0,G.enemy.hm);L(`Resolve → ${Math.round(G.turn.grit)} × (1+${G.turn.oath.toFixed(2)}) = ${raw} → after DR ${dmg}`);G.dice.forEach(d=>{if(d.effect.type==='teeth_on_resolve')addTeeth(d.effect.v)});endHand();checkEnd()}
+function endHand(){G.hands=Math.max(0,G.hands-1);G.energy=G.baseE;G.turn={grit:0,oath:0,rerolls:1,tags:new Set(),drawNext:0,doubleFury:false,lowerDR:0,shuffled:false};drawTo(5);$('btnResolve').disabled=true;ui()}
+function play(i){const n=G.hand[i],d=CARD_DB[n];if(G.energy<d.c)return;G.energy-=d.c;d.p(G);const[c]=G.hand.splice(i,1);G.discard.push(c);if(G.turn.drawNext>0){drawTo(Math.min(5,G.hand.length+G.turn.drawNext));G.turn.drawNext=0}ui();renderHand()}
+function shuffleHand(){if(G.turn.shuffled){L('Already shuffled.');return}G.turn.shuffled=true;while(G.hand.length){G.draw.push(G.hand.pop())}G.draw=shuffle(G.draw);drawTo(5);L('You reshuffle your options.')}
+
+function teethPop(n){const el=document.createElement('div');el.className='teethPop';el.style.color=n>=0?'#8fff8f':'#ff9f9f';el.textContent=(n>=0?'+':'')+n+' 🦷';document.body.appendChild(el);setTimeout(()=>el.remove(),800)}
+function addTeeth(n){G.teeth+=n;teethPop(n);ui()}
+
+function checkEnd(){if(G.enemy.hp<=0){L(`— ${G.enemy.name} felled. —`);const r=TEETH_REWARD[G.beast%3]||10;addTeeth(r);if(G.beast%3<2){showShop()}else{G.beast=-1;G.cave++}G.beast++}else if(G.hands<=0){alert('Out of hands! You regroup.');startBeast()}}
+
+function sampleDice(n){const weight=d=>d.affix==='common'?40:d.affix==='uncommon'?30:d.affix==='rare'?20:8;const bag=[];DICE.forEach(d=>{for(let i=0;i<weight(d);i++)bag.push(d)});const out=[];while(out.length<n){const c=clone(bag[R(bag.length)]);c.echo=Math.random()<SHOP.echoChance;if(!out.some(x=>x.name===c.name&&!!x.echo===!!c.echo))out.push(c)}return out}
+function sampleCards(n){const names=Object.keys(CARD_DB),out=[];while(out.length<n){const c=pick(names);if(!out.includes(c))out.push(c)}return out}
+function atCapAfterAdding(d){const nonEcho=G.dice.filter(x=>!x.echo).length;return (!d.echo)&&nonEcho>=4}
+function showSellModal(cb){$('sellChoices').innerHTML='';G.dice.forEach((d,i)=>{const c=document.createElement('div');c.className='choice';const rw=document.createElement('div');rw.className='row';rw.appendChild(mini(d));const v=(SELL[d.affix]||4)+(d.echo?SELL.echo:0);const meta=document.createElement('div');meta.innerHTML=`<b>${d.name}</b> ${d.echo?'<span class="badge">ECHO</span>':''}<div><span class="r ${d.affix}">${d.affix}</span> • eff ${d.effect.type}</div><div>Sell for <b>${v}🦷</b></div>`;const b=document.createElement('button');b.className='btn';b.textContent='Sell';b.onclick=()=>{addTeeth(v);G.dice.splice(i,1);hideAll();cb&&cb()};rw.appendChild(meta);rw.appendChild(b);c.appendChild(rw);$('sellChoices').appendChild(c)});show('sell')}
+
+function showShop(){const root=$('shopChoices');root.innerHTML='';$('teethHint').style.display='inline-block';$('teethShop').textContent=G.teeth;$('teethShop2').textContent=G.teeth;
+  const diceChoices=sampleDice(3), singleChoices=sampleCards(3), packChoices=sampleCards(3);
+  const sec1=document.createElement('div');sec1.className='choice';sec1.innerHTML=`<div class="row" style="justify-content:space-between"><div><b>Dice Bag</b><div class="pill" style="display:inline-block;margin-top:6px">Pick 1 of 3</div></div><div><b>${SHOP.diceBagCost}🦷</b></div></div>`;const row=document.createElement('div');row.className='row';
+  diceChoices.forEach(d=>{const b=document.createElement('button');b.className='btn';const wrap=document.createElement('div');wrap.className='row';wrap.appendChild(mini(d));const t=document.createElement('div');t.innerHTML=`${d.name} ${d.echo?'<span class="badge">ECHO</span>':''} <span class="r ${d.affix}">${d.affix}</span>`;wrap.appendChild(t);b.appendChild(wrap);b.onclick=()=>{if(G.teeth<SHOP.diceBagCost){alert('Not enough Teeth');return}const add=()=>{addTeeth(-SHOP.diceBagCost);G.dice.push(d);renderDice();ui();L(\`Took ${d.name}\${d.echo?' (Echo)':''}.\`)};if(atCapAfterAdding(d))showSellModal(add);else add()};row.appendChild(b)});sec1.appendChild(row);root.appendChild(sec1);
+  const sec2=document.createElement('div');sec2.className='choice';sec2.innerHTML=`<div class="row" style="justify-content:space-between"><div><b>Choose a Card</b><div class="pill" style="display:inline-block;margin-top:6px">Pick 1 of 3</div></div><div><b>${SHOP.singleCardCost}🦷</b></div></div>`;const row2=document.createElement('div');row2.className='row';
+  singleChoices.forEach(n=>{const b=document.createElement('button');b.className='btn';b.textContent=n;b.onclick=()=>{if(G.teeth<SHOP.singleCardCost){alert('Not enough Teeth');return}addTeeth(-SHOP.singleCardCost);G.discard.push(n);ui();L(\`Added ${n} to your deck.\`)};row2.appendChild(b)});sec2.appendChild(row2);root.appendChild(sec2);
+  const sec3=document.createElement('div');sec3.className='choice';sec3.innerHTML=`<div class="row" style="justify-content:space-between"><div><b>Card Pack</b><div class="pill" style="display:inline-block;margin-top:6px">Gain all 3</div></div><div><b>${SHOP.cardPackCost}🦷</b></div></div>`;const tags=document.createElement('div');tags.className='row';packChoices.forEach(n=>{const s=document.createElement('span');s.className='pill';s.textContent=n;tags.appendChild(s)});const buy=document.createElement('button');buy.className='btn';buy.textContent='Buy Pack';buy.onclick=()=>{if(G.teeth<SHOP.cardPackCost){alert('Not enough Teeth');return}addTeeth(-SHOP.cardPackCost);packChoices.forEach(n=>G.discard.push(n));ui();L(\`Packed ${packChoices.join(', ')} into your deck.\`)};sec3.appendChild(tags);sec3.appendChild(buy);root.appendChild(sec3);
+  show('shop')}
+function hideAll(){['shop','preview','sell','manage'].forEach(id=>$(id).style.display='none')}
+function show(id){hideAll();$(id).style.display='flex'}
+function hideShop(){hideAll();$('teethHint').style.display='none'}
+
+$('btnNew').onclick=newRun;$('btnRoll').onclick=roll;$('btnResolve').onclick=resolve;$('btnEnd').onclick=endHand;$('btnShuffle').onclick=shuffleHand;
+$('shopLeave').onclick=()=>{hideShop();showPreview()};$('previewContinue').onclick=()=>{hideAll();startBeast()};
+$('btnManage').onclick=()=>{const list=$('manageChoices');list.innerHTML='';G.dice.forEach((d,i)=>{const c=document.createElement('div');c.className='choice';const rw=document.createElement('div');rw.className='row';rw.appendChild(mini(d));const v=(SELL[d.affix]||4)+(d.echo?SELL.echo:0);const meta=document.createElement('div');meta.innerHTML=`<b>${d.name}</b> ${d.echo?'<span class="badge">ECHO</span>':''}<div><span class="r ${d.affix}">${d.affix}</span> • eff ${d.effect.type}</div><div>Sell for <b>${v}🦷</b></div>`;const b=document.createElement('button');b.className='btn';b.textContent='Sell';b.onclick=()=>{addTeeth(v);G.dice.splice(i,1);$('btnManage').click()};rw.appendChild(meta);rw.appendChild(b);c.appendChild(rw);list.appendChild(c)});show('manage')};
+$('manageClose').onclick=()=>hideAll();$('sellClose').onclick=()=>hideAll();
+
+function showPreview(){const body=$('previewBody');body.innerHTML='';const d=document.createElement('div');d.className='choice';d.innerHTML='<b>Dice</b>';G.dice.forEach(x=>{const r=document.createElement('div');r.className='row';r.appendChild(mini(x));const t=document.createElement('div');t.innerHTML=`${x.name} ${x.echo?'<span class="badge">ECHO</span>':''} <span class="r ${x.affix}">${x.affix}</span>`;r.appendChild(t);d.appendChild(r)});const c=document.createElement('div');c.className='choice';c.innerHTML=`<b>Deck</b> <span class="pill">${G.draw.length+G.hand.length+G.discard.length} cards</span>`;const list=document.createElement('div');list.className='row';(G.draw.concat(G.hand,G.discard)).slice(0,12).forEach(n=>{const s=document.createElement('span');s.className='pill';s.textContent=n;list.appendChild(s)});c.appendChild(list);const t=document.createElement('div');t.className='choice';t.innerHTML=`<b>Teeth</b> <span class="pill">🦷 ${G.teeth}</span>`;body.appendChild(d);body.appendChild(c);body.appendChild(t);show('preview')}
+
+newRun();
+</script>
+</body>
+</html>
